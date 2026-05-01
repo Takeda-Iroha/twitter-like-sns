@@ -145,9 +145,9 @@ import { ref } from 'vue'
 import type { FetchError } from 'ofetch' // 型安全のためにインポート
 
 // =========================
-// 1. 型定義（YAMLに基づく）
+// 1. 型定義
 // =========================
-interface AuthResponse {
+interface UserDate {
   data: {
     user: {
       id: string
@@ -155,14 +155,13 @@ interface AuthResponse {
       email: string
       displayName: string | null
     }
-    token: string
+    accesstoken: string
     refreshToken: string
     expiresIn: number
   }
 }
 
-// YAMLの Error schema を定義（any排除の鍵）
-interface ApiErrorResponse {
+interface SignupErrorResponse {
   error: {
     code: string
     message: string
@@ -176,9 +175,9 @@ interface ApiErrorResponse {
 // =========================
 // 2. 状態管理
 // =========================
+const username = ref('')
 const email = ref('')
 const password = ref('')
-const username = ref('')
 const displayName = ref('')
 
 const authToken = useCookie<string | null>('auth_token')
@@ -196,7 +195,7 @@ const handleSignup = async () => {
   }
 
   try {
-    const response = await $fetch<AuthResponse>('https://apg-joetsu.tail02904.ts.net/api/auth/register', {
+    const response = await $fetch<UserDate>('https://apg-joetsu.tail02904.ts.net/api/auth/register', {
       method: 'POST',
       body: {
         username: username.value,
@@ -206,14 +205,14 @@ const handleSignup = async () => {
       }
     })
 
-    authToken.value = response.data.token
+    authToken.value = response.data.accesstoken
     refreshToken.value = response.data.refreshToken
 
     alert('登録完了')
     navigateTo('/login')
 
   } catch (e: unknown) {
-    const fetchError = e as FetchError<ApiErrorResponse>
+    const fetchError = e as FetchError<SignupErrorResponse>
     const status = fetchError.response?.status
     const errorData = fetchError.response?._data?.error
     
