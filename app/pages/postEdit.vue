@@ -6,33 +6,32 @@ const postContent = ref('')
 
 const router = useRouter()
 
-//キャンセルボタン
 const goBack = () => {
   router.back()
 }
 
-//投稿作成処理
-const createPost = () => {
+//投稿編集処理
+const editPost = () => {
   navigateTo('/')
 
 }
 
 //ーーーーーー画面遷移↓↓↓ーーーーーーーー
 const goToPostForm = () => {
-  navigateTo('/postForm')
+  navigateTo('/postForm')//投稿作成画面へ
 }
 
 const goToHome = () => {
-  navigateTo('/')
+  navigateTo('/')//ホームへ
 }
 
 const goToMypage = () => {
-  navigateTo('/mypage')
+  navigateTo('/mypage')//マイページへ
 }
 </script>
 
 <template>
-  <div class="create-post-page">
+  <div class="post-edit-page">
     <header class="header">
       <div class="menu_icon" @click="isMenuOpen = true">
           <img src="/images/icon_menu.svg" alt="メニューを表示" class="menu-icon" />
@@ -76,8 +75,8 @@ const goToMypage = () => {
         <button @click="goBack" class="cancel-btn">キャンセル</button>
 
         <div class="post-actions">
-          <button @click="createPost" class="post-btn" :disabled="!postContent.trim() || postContent.length > 250"
-            >投稿する</button>
+          <button @click="editPost" class="post-btn" :disabled="!postContent.trim() || postContent.length > 250"
+            >再投稿する</button>
           <div class="char-count" :class="{'error':postContent.length > 250}">
             {{ postContent.length }} / 250
           </div>
@@ -86,7 +85,7 @@ const goToMypage = () => {
 
       <div class="post-form-content">
         <div class="user-icon"></div>
-        <textarea v-model="postContent" class="post-textarea" placeholder="今なにしてる？"></textarea>
+        <textarea v-model="postContent" class="post-textarea" placeholder="既存の投稿表示"></textarea>
       </div>
     </div>
   </div>
@@ -104,6 +103,8 @@ body {
 </style>
 
 <style scoped>
+
+
 /*  ヘッダー　*/
 .header {
   background: linear-gradient(90deg, #6a21aa, #c65bed, #ecb5f5);
@@ -138,7 +139,6 @@ body {
   height: 100%;
   background-color: #f9f9f9;
   z-index: 1000;
-  /* 左側に隠れてる */
   transform: translateX(-100%);
   /*アニメーション*/
   transition: transform 0.3s ease;
@@ -156,16 +156,16 @@ body {
   height: 60px;
   border-radius: 50%;    
   margin-right: 15px;    
-  flex-shrink: 0;        
-  
+  flex-shrink: 0;
   
   background-image: url('/images/user_photo.jpg'); 
   
   /*画像の切り取り方を指定 */
-  background-size: cover;
-  background-position: center; 
+  background-size: cover;      
+  background-position: center;
   background-repeat: no-repeat;
   
+  /* 画像がない時用のバックアップ色 */
   background-color: #ddd; 
 }
 
@@ -188,11 +188,12 @@ body {
   object-fit: contain; 
 }
 
+/* 「is-open」クラスがついたら画面内に戻す */
 .side-menu.is-open {
   transform: translateX(0);
 }
 
-/* 背景を暗くするレイヤー */
+
 .menu-overlay {
   position: fixed;
   top: 0;
@@ -203,7 +204,7 @@ body {
   z-index: 999;
 }
 
-.spacer { width: 25px; } 
+.spacer { width: 25px; }
 
 /* 投稿作成エリア */
 
@@ -225,15 +226,15 @@ body {
   height: 60px;
   border-radius: 50%;    
   margin-right: 15px;    
-  flex-shrink: 0;        
-  
+  flex-shrink: 0;
   background-image: url('/images/user_photo.jpg'); 
   
+  /*画像の切り取り方を指定 */
+  background-size: cover;
+  background-position: center; 
+  background-repeat: no-repeat;
   
-  background-size: cover; 
-  background-position: center;
-  background-repeat: no-repeat; 
-  
+  /* 画像がない時用のバックアップ色 */
   background-color: #ddd; 
 }
 
@@ -305,4 +306,7 @@ background-color: #c65bed;
   color: red;          /* 250文字以上で赤 */
   font-weight: bold;
 }
+
+
 </style>
+

@@ -1,3 +1,64 @@
+<script setup lang="ts">
+import { ref } from 'vue'
+
+const isMenuOpen = ref(false)//サイドメニュー
+
+
+interface Post {
+  id: number;
+  userName: string;
+  postText: string;
+  postDate: string;
+  isLiked?: boolean; // いいねの状態を追加（任意）
+}
+
+const posts = ref<Post[]>([
+  {
+    id: 1,
+    userName: 'takeda',
+    postText: 'よろしくお願いしますmm',
+    postDate: '1時間前',
+    isLiked: false
+  },
+  {
+    id: 2,
+    userName: 'takeda',
+    postText: 'TypeScript学習中・・・',
+    postDate: '2時間前',
+    isLiked: false
+  },
+   {
+    id: 3,
+    userName: 'takeda',
+    postText: '投稿３',
+    postDate: '１日前',
+    isLiked: false
+  },
+    {
+    id: 4,
+    userName: 'takeda',
+    postText: '投稿４',
+    postDate: '３日前',
+    isLiked: false
+  }
+])
+
+//ーーーーーー画面遷移↓ーーーーーーーー
+const goToPostForm = () => {
+  navigateTo('/postForm')
+}
+
+const goToHome = () => {
+  navigateTo('/')
+}
+
+const goToMypage = () => {
+  navigateTo('/mypage')
+}
+
+
+</script>
+
 <template>
   <div class="app-container">
     
@@ -114,17 +175,15 @@ body {
   height: 100%;
   background-color: #f9f9f9;
   z-index: 1000;
-  /* 左側に隠れてる */
   transform: translateX(-100%);
-  /*アニメーション*/
   transition: transform 0.3s ease;
 }
 
 .menu-user-info {
-  display: flex;      /* 横並び */
-  align-items: center; /* アイコンと名前の高さを中央で揃える */
+  display: flex;      
+  align-items: center; 
   padding: 20px;       
-  border-bottom: 1px solid #ddd; /* 下線 */
+  border-bottom: 1px solid #ddd; 
 }
 
 .menu-user-icon {
@@ -132,16 +191,15 @@ body {
   height: 60px;
   border-radius: 50%;    
   margin-right: 15px;    
-  flex-shrink: 0;        /* アイコンが潰れないようにする */
-  
-  /* ---ここからが「普通の写真」をきれいに埋め込む設定 --- */
+  flex-shrink: 0;        
+ 
   
   background-image: url('/images/user_photo.jpg'); 
   
   /*画像の切り取り方を指定 */
-  background-size: cover;      /* 枠いっぱいに広げ、はみ出た分はカットする */
-  background-position: center; /* 画像の中央を基準に表示する */
-  background-repeat: no-repeat; /* 画像を繰り返さない */
+  background-size: cover;      
+  background-position: center; 
+  background-repeat: no-repeat; 
   
   /* 画像がない時用のバックアップ色 */
   background-color: #ddd; 
@@ -149,8 +207,8 @@ body {
 
 .menu-user-text {
   display: flex;
-  flex-direction: column; /* 縦並べ */
-  justify-content: center; /* 高さ中央揃え */
+  flex-direction: column; 
+  justify-content: center; 
 }
 
 .menu-user-text .user-id {
@@ -184,9 +242,9 @@ body {
 }
 
 
-.spacer { width: 25px; } /* ロゴを中央にするための隙間 */
+.spacer { width: 25px; } 
 
-/* 3. 投稿エリアの幅制限（スマホ幅） */
+/* 3. 投稿エリアの幅制限） */
 .main-content {
   max-width: 450px;
   margin: 0 auto;
@@ -199,14 +257,14 @@ body {
   color: #333;
 }
 
-/* 4. 投稿カードのデザイン */
+/* 4. 投稿カード */
 .post-card {
   background-color: white;
   border: 2px solid #000;
   border-radius: 20px;
   padding: 15px;
   margin-bottom: 15px;
-  display: flex; /* アイコンと文章を横に並べる */
+  display: flex;
   box-shadow: 0 4px 0px rgba(0,0,0,0.05);
 }
 
@@ -262,13 +320,13 @@ body {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  margin: -8px; /* ボタンの周りのスペースをなくすためにマイナスのマージン */
+  margin: -8px;
 }
 
 .heart-icon {
   width: 22px;
   height: 22px;
-  object-fit: contain; /* 画像が歪まないようにする */
+  object-fit: contain; 
 
 }
 
@@ -299,66 +357,3 @@ body {
   cursor: pointer;
 }
 </style>
-
-
-<script setup lang="ts">
-import { ref } from 'vue'
-
-const isMenuOpen = ref(false)//サイドメニュー
-
-
-interface Post {
-  id: number;
-  userName: string;
-  postText: string;
-  postDate: string;
-  isLiked?: boolean; // いいねの状態を追加（任意）
-}
-
-const posts = ref<Post[]>([
-  {
-    id: 1,
-    userName: 'takeda',
-    postText: 'よろしくお願いしますmm',
-    postDate: '1時間前',
-    isLiked: false
-  },
-  {
-    id: 2,
-    userName: 'takeda',
-    postText: 'TypeScript学習中・・・',
-    postDate: '2時間前',
-    isLiked: false
-  },
-   {
-    id: 3,
-    userName: 'takeda',
-    postText: '投稿３',
-    postDate: '１日前',
-    isLiked: false
-  },
-    {
-    id: 4,
-    userName: 'takeda',
-    postText: '投稿４',
-    postDate: '３日前',
-    isLiked: false
-  }
-])
-//投稿日時やいいねも追加する・・・？
-
-//ーーーーーー画面遷移↓↓↓ーーーーーーーー
-const goToPostForm = () => {
-  navigateTo('/postForm')//投稿作成画面へ
-}
-
-const goToHome = () => {
-  navigateTo('/')//ホームへ
-}
-
-const goToMypage = () => {
-  navigateTo('/mypage')//マイページへ
-}
-
-
-</script>

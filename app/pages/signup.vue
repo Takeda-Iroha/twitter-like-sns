@@ -1,3 +1,97 @@
+<script setup lang="ts">
+import { ref } from 'vue'
+import type { FetchError } from 'ofetch'
+
+// =========================
+// 1. 型定義
+// =========================
+interface UserData {
+  data: {
+    user: {
+      id: string
+      username: string
+      email: string
+      displayName: string | null
+    }
+    accessToken: string
+    refreshToken: string
+    expiresIn: number
+  }
+}
+
+interface SignupErrorResponse {
+  error: {
+    code: string
+    message: string
+    details?: Array<{
+      field: string
+      message: string
+    }>
+  }
+}
+
+// =========================
+// 2. 状態管理
+// =========================
+const username = ref('')
+const email = ref('')
+const password = ref('')
+const displayName = ref('')
+
+const authToken = useCookie<string | null>('auth_token')
+const refreshToken = useCookie<string | null>('auth_refresh_token')
+
+const goToLogin = () => navigateTo('/login')
+
+// =========================
+// 3. 登録処理
+// =========================
+const handleSignup = async () => {
+  if (!email.value || !password.value || !username.value) {
+    alert('未入力項目があります')
+    return
+  }
+
+  try {
+    const response = await $fetch<UserData>('https://apg-joetsu.tail02904.ts.net/api/auth/register', {
+      method: 'POST',
+      body: {
+        username: username.value,
+        email: email.value,
+        password: password.value,
+        displayName: displayName.value || null
+      }
+    })
+
+    authToken.value = response.data.accessToken
+    refreshToken.value = response.data.refreshToken
+
+    alert('登録完了')
+    navigateTo('/login')
+
+  } catch (e: unknown) {
+    const fetchError = e as FetchError<SignupErrorResponse>
+    const status = fetchError.response?.status
+    const errorData = fetchError.response?._data?.error
+    
+    const mainMessage = errorData?.message || 'エラーが発生しました'
+    
+    // detailsがある場合は、どの項目がダメか詳細を作る
+    const detailMsg = errorData?.details 
+      ? '\n' + errorData.details.map(d => `・${d.field}: ${d.message}`).join('\n')
+      : ''
+
+    if (status === 409) {
+      alert(`【既に登録済み】\n${mainMessage}${detailMsg}`)
+    } else if (status === 400) {
+      alert(`【入力内容の不備】\n${mainMessage}${detailMsg}`)
+    } else {
+      alert(`【エラー ${status}】\n${mainMessage}`)
+    }
+  }
+}
+</script>
+
 <template>
   <div class="signup-page">
     <main class="main-content">
@@ -106,7 +200,7 @@
 }
 
 .custom-input:focus {
-  border-color: #555; /* 入力中少し色を変える */
+  border-color: #555;
 }
 
 /* サインアップボタン */
@@ -129,108 +223,13 @@
   opacity: 0.8;
 }
 
-/* スマホでの微調整 */
+/* スマホの微調整 */
 @media (max-width: 480px) {
   .signup-page {
-    padding-top: 5vh; /* スマホではもう少し上に */
+    padding-top: 5vh;
   }
   .signup-title {
     font-size: 28px;
   }
 }
 </style>
-
-<script setup lang="ts">
-import { ref } from 'vue'
-import type { FetchError } from 'ofetch' // 型安全のためにインポート
-
-// =========================
-// 1. 型定義
-// =========================
-interface UserDate {
-  data: {
-    user: {
-      id: string
-      username: string
-      email: string
-      displayName: string | null
-    }
-    accesstoken: string
-    refreshToken: string
-    expiresIn: number
-  }
-}
-
-interface SignupErrorResponse {
-  error: {
-    code: string
-    message: string
-    details?: Array<{
-      field: string
-      message: string
-    }>
-  }
-}
-
-// =========================
-// 2. 状態管理
-// =========================
-const username = ref('')
-const email = ref('')
-const password = ref('')
-const displayName = ref('')
-
-const authToken = useCookie<string | null>('auth_token')
-const refreshToken = useCookie<string | null>('auth_refresh_token')
-
-const goToLogin = () => navigateTo('/login')
-
-// =========================
-// 3. 登録処理
-// =========================
-const handleSignup = async () => {
-  if (!email.value || !password.value || !username.value) {
-    alert('未入力項目があります')
-    return
-  }
-
-  try {
-    const response = await $fetch<UserDate>('https://apg-joetsu.tail02904.ts.net/api/auth/register', {
-      method: 'POST',
-      body: {
-        username: username.value,
-        email: email.value,
-        password: password.value,
-        displayName: displayName.value || null
-      }
-    })
-
-    authToken.value = response.data.accesstoken
-    refreshToken.value = response.data.refreshToken
-
-    alert('登録完了')
-    navigateTo('/login')
-
-  } catch (e: unknown) {
-    const fetchError = e as FetchError<SignupErrorResponse>
-    const status = fetchError.response?.status
-    const errorData = fetchError.response?._data?.error
-    
-    // エラーメッセージの組み立て
-    const mainMessage = errorData?.message || 'エラーが発生しました'
-    
-    // detailsがある場合は、どの項目がダメか詳細を作る
-    const detailMsg = errorData?.details 
-      ? '\n' + errorData.details.map(d => `・${d.field}: ${d.message}`).join('\n')
-      : ''
-
-    if (status === 409) {
-      alert(`【既に登録済み】\n${mainMessage}${detailMsg}`)
-    } else if (status === 400) {
-      alert(`【入力内容の不備】\n${mainMessage}${detailMsg}`)
-    } else {
-      alert(`【エラー ${status}】\n${mainMessage}`)
-    }
-  }
-}
-</script>

@@ -1,3 +1,62 @@
+<script setup lang="ts">
+import { ref } from 'vue';
+
+const isMenuOpen = ref(false)
+interface Post {
+  id: number;
+  userName: string;
+  postText: string;
+  postDate: string;
+  isLiked?: boolean; 
+  likes: number;
+}
+
+const posts = ref<Post[]>([
+  {
+    id: 1,
+    userName: 'takeda',
+    postText: 'よろしくお願いいたします！',
+    postDate: '1時間前',
+    isLiked: false,
+    likes: 0
+  },
+  {
+    id: 2,
+    userName: 'takeda',
+    postText: 'TypeScript学習中です・・・',
+    postDate: '2時間前',
+    isLiked: false,
+    likes: 0
+  },
+   {
+    id: 3,
+    userName: 'takeda',
+    postText: '毎朝猫に起こされる',
+    postDate: '１日前',
+    isLiked: false,
+    likes: 0
+  },
+    {
+    id: 4,
+    userName: 'takeda',
+    postText: '来世は猫になりたい',
+    postDate: '３日前',
+    isLiked: false,
+    likes: 0
+  }
+]);
+
+//ーーーーーー画面遷移↓↓↓ーーーーーーーー
+const goToPostForm = () => {
+  navigateTo('/postForm')
+}
+
+const goToHome = () => {
+  navigateTo('/')
+}
+
+</script>
+
 <template>
 <div class="mypage-content">
     <header class="header">
@@ -126,15 +185,13 @@
   height: 100%;
   background-color: #f9f9f9;
   z-index: 1000;
-  /* 左側に隠れてる */
   transform: translateX(-100%);
-  /*アニメーション*/
   transition: transform 0.3s ease;
 }
 
 .menu-user-info {
-  display: flex;      /* 横並び */
-  align-items: center; /* アイコンと名前の高さを中央で揃える */
+  display: flex;
+  align-items: center;
   padding: 20px;       
   border-bottom: 1px solid #ddd; /* 下線 */
 }
@@ -144,25 +201,20 @@
   height: 60px;
   border-radius: 50%;    
   margin-right: 15px;    
-  flex-shrink: 0;        /* アイコンが潰れないようにする */
-  
-  /* ---ここからが「普通の写真」をきれいに埋め込む設定 --- */
-  
+  flex-shrink: 0;        
   background-image: url('/images/user_photo.jpg'); 
   
-  /*画像の切り取り方を指定 */
-  background-size: cover;      /* 枠いっぱいに広げ、はみ出た分はカットする */
-  background-position: center; /* 画像の中央を基準に表示する */
-  background-repeat: no-repeat; /* 画像を繰り返さない */
-  
-  /* 画像がない時用のバックアップ色 */
+  background-size: cover;      
+  background-position: center; 
+  background-repeat: no-repeat; 
+
   background-color: #ddd; 
 }
 
 .menu-user-text {
   display: flex;
-  flex-direction: column; /* 縦並べ */
-  justify-content: center; /* 高さ中央揃え */
+  flex-direction: column; 
+  justify-content: center; 
 }
 
 .menu-user-text .user-id {
@@ -196,9 +248,8 @@
 }
 
 
-.spacer { width: 25px; } /* ロゴを中央にするための隙間 */
+.spacer { width: 25px; } 
 
-/* PCで広がりすぎないための制限 */
 .mypage-wrapper {
   max-width: 600px;
   margin: 0 auto;
@@ -284,64 +335,3 @@
 .like-num { margin-right: 5px; font-size: 14px; }
 .heart-icon { font-size: 18px; cursor: pointer; }
 </style>
-
-<script setup lang="ts">
-import { ref } from 'vue';
-
-const isMenuOpen = ref(false)//サイドメニュー
-
-interface Post {
-  id: number;
-  userName: string;
-  postText: string;
-  postDate: string;
-  isLiked?: boolean; // いいねの状態を追加（任意）
-  likes: number; // いいねの数を追加（任意）
-}
-
-const posts = ref<Post[]>([
-  {
-    id: 1,
-    userName: 'takeda',
-    postText: 'よろしくお願いいたします！',
-    postDate: '1時間前',
-    isLiked: false,
-    likes: 0
-  },
-  {
-    id: 2,
-    userName: 'takeda',
-    postText: 'TypeScript学習中です・・・',
-    postDate: '2時間前',
-    isLiked: false,
-    likes: 0
-  },
-   {
-    id: 3,
-    userName: 'takeda',
-    postText: '毎朝猫に起こされる',
-    postDate: '１日前',
-    isLiked: false,
-    likes: 0
-  },
-    {
-    id: 4,
-    userName: 'takeda',
-    postText: '来世は猫になりたい',
-    postDate: '３日前',
-    isLiked: false,
-    likes: 0
-  }
-]);
-
-//ーーーーーー画面遷移↓↓↓ーーーーーーーー
-const goToPostForm = () => {
-  navigateTo('/postForm')//投稿作成画面へ
-}
-
-const goToHome = () => {
-  navigateTo('/')//ホームへ
-}
-
-
-</script>

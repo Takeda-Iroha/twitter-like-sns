@@ -1,3 +1,63 @@
+<script setup lang="ts">
+import { ref } from 'vue'
+import type { FetchError } from 'ofetch'
+
+// =========================
+// 1. 状態管理
+// =========================
+const username = ref('')
+const password = ref('')
+const email = ref('')
+
+const authToken = useCookie<string | null>('auth_token')
+
+// =========================
+// 2. ログイン処理
+// =========================
+const handleLogin = async () => {
+  if (!username.value || !password.value || !email.value) {
+    alert('すべての項目を入力してください。')
+    return
+  }
+
+  try {
+    const response = await $fetch<any>('https://apg-joetsu.tail02904.ts.net/api/auth/login', {
+      method: 'POST',
+      body: {
+        username: username.value,
+        email: email.value,
+        password: password.value
+      }
+    })
+
+    const token = response.data?.accessToken
+
+    if (token) {
+      authToken.value = token
+      alert('ログインに成功しました。')
+      navigateTo('/')
+    } else {
+      console.error('Unexpected response structure:', response)
+      alert('認証データが正しく取得できませんでした。')
+    }
+
+  } catch (e: unknown) {
+    const fetchError = e as FetchError<any>
+    const status = fetchError.response?.status
+    
+    if (status === 401) {
+      alert('ユーザー名またはパスワードが正しくありません。')
+    } else if (status === 400) {
+      alert('リクエストが不正です。入力内容を確認してください。')
+    } else {
+      alert(`サーバーエラーが発生しました（Status: ${status}）`)
+    }
+  }
+}
+
+const goToSignup = () => navigateTo('/signup')
+</script>
+
 <template>
   <div class="login-page">
     <main class="main-content">
@@ -15,13 +75,16 @@
           </div>
 
           <div class="input-group">
+            <label>E-mail</label>
+            <input v-model="email" type="email" placeholder="xxx@xxx.com" class="custom-input" />
+          </div>
+
+          <div class="input-group">
             <label>Password</label>
             <input v-model="password" type="password" placeholder="Enter your password" class="custom-input" />
           </div>
 
         </div>
-
-        
 
         <button class="login-button" @click="handleLogin">Login</button>
       </div>
@@ -35,7 +98,6 @@
   background-color: #fff;
   display: flex;
   justify-content: center;
-  /* align-items: center ではなく、上側に余白を持たせて配置 */
 }
 
 .main-content {
@@ -72,7 +134,7 @@
 /* 入力リストの設定 */
 .input-list {
   margin-top: 40px;
-  text-align: left; /* ラベルは左寄せ */
+  text-align: left;
 }
 
 .input-group {
@@ -131,63 +193,3 @@
 }
 </style>
 
-<script setup lang="ts">
-import { ref } from 'vue'
-import type { FetchError } from 'ofetch'
-
-// =========================
-// 1. 状態管理
-// =========================
-const username = ref('')
-const password = ref('')
-
-const authToken = useCookie<string | null>('auth_token')
-
-// =========================
-// 2. ログイン処理
-// =========================
-const handleLogin = async () => {
-  if (!username.value || !password.value) {
-    alert('ユーザー名とパスワードを入力してください。')
-    return
-  }
-
-  try {
-    // 仕様変更の過渡期に対応するため、レスポンスは柔軟に受け取る
-    const response = await $fetch<any>('https://apg-joetsu.tail02904.ts.net/api/auth/login', {
-      method: 'POST',
-      body: {
-        username: username.value,
-        password: password.value
-      }
-    })
-
-    // 仕様書(accessToken)と実態(token)の両方をチェック
-    const token = response.data?.accessToken || response.data?.token
-
-    if (token) {
-      authToken.value = token
-      alert('ログインに成功しました。')
-      navigateTo('/') // ログイン後の遷移先
-    } else {
-      console.error('Unexpected response structure:', response)
-      alert('認証データが正しく取得できませんでした。')
-    }
-
-  } catch (e: unknown) {
-    const fetchError = e as FetchError<any>
-    const status = fetchError.response?.status
-    
-    // HTTPステータスコードに基づいたエラーハンドリング
-    if (status === 401) {
-      alert('ユーザー名またはパスワードが正しくありません。')
-    } else if (status === 400) {
-      alert('リクエストが不正です。入力内容を確認してください。')
-    } else {
-      alert(`サーバーエラーが発生しました（Status: ${status}）`)
-    }
-  }
-}
-
-const goToSignup = () => navigateTo('/signup')
-</script>
