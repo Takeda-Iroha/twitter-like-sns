@@ -1,67 +1,94 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 
-const isMenuOpen = ref(false)//サイドメニュー
-
+const isMenuOpen = ref(false)
 
 interface Post {
-  id: number;
-  userName: string;
-  postText: string;
-  postDate: string;
-  isLiked?: boolean; // いいねの状態を追加（任意）
+  id: number
+  userName: string
+  userId: string
+  postText: string
+  postDate: Date
+  isLiked?: boolean
+  likes: number
+  hasImage?: boolean
 }
 
+// ----------------------------------------
+// 投稿データ
+// postDateはnew Date(Date.now() - ミリ秒)で「現在から◯秒前」を表現
+// 1000ms = 1秒 / 60秒 = 1分 / 60分 = 1時間 / 24時間 = 1日
+// ----------------------------------------
 const posts = ref<Post[]>([
   {
     id: 1,
     userName: 'takeda',
+    userId: 'takeda_168',
     postText: 'よろしくお願いしますmm',
-    postDate: '1時間前',
-    isLiked: false
+    postDate: new Date(Date.now() - 1000 * 60 * 60),
+    isLiked: false,
+    likes: 3,
+    hasImage: true  // 画像ありのダミー表示
   },
   {
     id: 2,
     userName: 'takeda',
+    userId: 'takeda_168',
     postText: 'TypeScript学習中・・・',
-    postDate: '2時間前',
-    isLiked: false
+    postDate: new Date(Date.now() - 1000 * 60 * 60 * 2),
+    isLiked: false,
+    likes: 0
   },
-   {
+  {
     id: 3,
     userName: 'takeda',
+    userId: 'takeda_168',
     postText: '投稿３',
-    postDate: '１日前',
-    isLiked: false
+    postDate: new Date(Date.now() - 1000 * 60 * 60 * 25),
+    isLiked: false,
+    likes: 1
   },
-    {
+  {
     id: 4,
     userName: 'takeda',
+    userId: 'takeda_168',
     postText: '投稿４',
-    postDate: '３日前',
-    isLiked: false
+    postDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3),
+    isLiked: false,
+    likes: 0
   }
 ])
 
-//ーーーーーー画面遷移↓ーーーーーーーー
-const goToPostForm = () => {
-  navigateTo('/postForm')
+// ----------------------------------------
+// 投稿時刻を「◯分前 / ◯時間前 / ◯日前」に変換する関数
+// Dateオブジェクトを受け取り、現在時刻との差を文字列で返す
+// ----------------------------------------
+const formatRelativeTime = (date: Date): string => {
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime() 
+  const diffMin = Math.floor(diffMs / 1000 / 60)
+
+  if (diffMin < 1) {
+    return 'たった今'
+  } else if (diffMin < 60) {
+    return `${diffMin}分前`
+  } else if (diffMin < 60 * 24) {
+    return `${Math.floor(diffMin / 60)}時間前`
+  } else {
+    return `${Math.floor(diffMin / 60 / 24)}日前`
+  }
 }
 
-const goToHome = () => {
-  navigateTo('/')
-}
-
-const goToMypage = () => {
-  navigateTo('/mypage')
-}
-
-
+// 画面遷移
+const goToPostForm = () => { navigateTo('/postForm') }
+const goToHome = () => { navigateTo('/') }
+const goToMypage = () => { navigateTo('/mypage') }
 </script>
 
 <template>
   <div class="app-container">
-    
+
+    <!-- ヘッダー -->
     <header class="header">
       <div class="menu_icon" @click="isMenuOpen = true">
         <img src="/images/icon_menu.svg" alt="メニューを表示" class="menu-icon" />
@@ -69,7 +96,8 @@ const goToMypage = () => {
       <h1 class="logo">APG</h1>
       <div class="spacer"></div>
     </header>
-    
+
+    <!-- サイドメニュー -->
     <aside class="side-menu" :class="{ 'is-open': isMenuOpen }">
       <div class="menu-user-info">
         <div class="menu-user-icon"></div>
@@ -78,49 +106,80 @@ const goToMypage = () => {
           <p class="user-id">UserID</p>
         </div>
       </div>
-  
-        <nav class="menu-links">
-          <div class="menu-item" @click="goToHome">
-            <img src="/images/icon_home.svg" class="menu-item-icon" alt="">
-            <span class="menu-item-text">ホーム</span>
-          </div>
-          
-          <div class="menu-item" @click="goToPostForm">
-            <img src="/images/icon_post.svg" class="menu-item-icon" alt="">
-            <span class="menu-item-text">投稿を作成</span>
-          </div>
-          <div class="menu-item" @click="goToMypage">
-            <img src="/images/icon_mypage.svg" class="menu-item-icon" alt="">
-            <span class="menu-item-text">マイページ</span>
-          </div>
-        </nav>
-      </aside>
+      <nav class="menu-links">
+        <div class="menu-item" @click="goToHome">
+          <img src="/images/icon_home.svg" class="menu-item-icon" alt="">
+          <span class="menu-item-text">ホーム</span>
+        </div>
+        <div class="menu-item" @click="goToPostForm">
+          <img src="/images/icon_post.svg" class="menu-item-icon" alt="">
+          <span class="menu-item-text">投稿を作成</span>
+        </div>
+        <div class="menu-item" @click="goToMypage">
+          <img src="/images/icon_mypage.svg" class="menu-item-icon" alt="">
+          <span class="menu-item-text">マイページ</span>
+        </div>
+      </nav>
+    </aside>
 
+    <!-- サイドメニューを閉じるための背景オーバーレイ -->
     <div v-if="isMenuOpen" class="menu-overlay" @click="isMenuOpen = false"></div>
 
+    <!-- メインコンテンツ -->
     <main class="main-content">
       <p class="section-title">最近の投稿</p>
 
+      <!-- 投稿カード一覧 -->
       <article class="post-card" v-for="post in posts" :key="post.id">
-        <div class="user-icon"></div>
-        <div class="post-content">
-          <div class="user-meta">
-            <span class="user-name">{{ post.userName }}</span>
-            <span class="post-date">・{{ post.postDate }}</span>
+        <div class="post-inner">
+
+          <!-- カードヘッダー：アイコン・ユーザー名・投稿時刻・ユーザーID -->
+          <div class="post-header">
+            <div class="post-user-icon"></div>
+            <div class="post-user-info">
+              <div class="name-row">
+                <span class="p-user-name">{{ post.userName }}</span>
+                <!-- formatRelativeTime()でDateを「◯時間前」に変換して表示 -->
+                <span class="post-time-inline">・{{ formatRelativeTime(post.postDate) }}</span>
+              </div>
+              <span class="p-user-id">{{ post.userId }}</span>
+            </div>
           </div>
-          <p class="user-id">takeda_168</p>
-          <p class="post-text">{{post.postText}}</p>
-          <div class="post-actions">
-            <button class="heart-button" @click="post.isLiked = !post.isLiked">
-              <img v-if="post.isLiked" src="/images/icon_heart_fill.svg" class="heart-icon liked" alt="いいね済み">
-              <img v-else src="/images/icon_heart.svg" class="heart-icon" alt="いいね">
-            </button>
+
+          <!-- 投稿本文 -->
+          <div class="post-body">
+            <p>{{ post.postText }}</p>
+
+            <!-- 画像ありの投稿のみダミープレースホルダーを表示 -->
+            <!-- 今後<img :src="post.imageUrl"> に置き換える -->
+            <div v-if="post.hasImage" class="post-image-placeholder">
+              <span class="placeholder-text">画像プレビュー（未実装）</span>
+            </div>
           </div>
+
+          <!-- カードフッター：いいねボタン -->
+          <div class="post-footer">
+            <div class="like-area">
+              <!-- likes が1以上の時だけ数字を表示 -->
+              <span v-if="post.likes > 0" class="like-num">{{ post.likes }}</span>
+              <!-- いいねボタン：画像アイコンを使用 -->
+              <!-- クリックでisLikedを反転、likesのカウントも増減 -->
+              <button
+                class="heart-button"
+                @click="post.isLiked = !post.isLiked; post.likes += post.isLiked ? 1 : -1"
+              >
+                <img v-if="post.isLiked" src="/images/icon_heart_fill.svg" class="heart-icon liked" alt="いいね済み">
+                <img v-else src="/images/icon_heart.svg" class="heart-icon" alt="いいね">
+              </button>
+            </div>
+          </div>
+
         </div>
       </article>
-      
+
     </main>
 
+    <!-- 投稿作成フローティングボタン -->
     <button class="add-button" @click="goToPostForm">+</button>
 
   </div>
@@ -128,20 +187,19 @@ const goToMypage = () => {
 
 
 <style>
+/* グローバルスタイル（全ページ共通） */
 body {
   margin: 0;
   padding: 0;
-  background-color: #f5f5f5; 
+  background-color: #f5f5f5;
   font-family: "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
 }
-
 </style>
 
 <style scoped>
-/* 画面全体の基本設定 */
-
-
-/*  ヘッダー　*/
+/* =============================
+   ヘッダー
+   ============================= */
 .header {
   background: linear-gradient(90deg, #6a21aa, #c65bed, #ecb5f5);
   color: white;
@@ -155,18 +213,13 @@ body {
   top: 0;
   z-index: 10;
 }
+.logo { font-size: 20px; margin: 0; }
+.menu_icon img { width: 24px; height: 24px; }
+.spacer { width: 25px; }
 
-.logo {
-  font-size: 20px;
-  margin: 0;
-}
-
-.menu_icon img {
-  width: 24px;
-  height: 24px;
-}
-
-/* サイドメニューの基本設定 */
+/* =============================
+   サイドメニュー
+   ============================= */
 .side-menu {
   position: fixed;
   top: 0;
@@ -175,62 +228,38 @@ body {
   height: 100%;
   background-color: #f9f9f9;
   z-index: 1000;
-  transform: translateX(-100%);
+  transform: translateX(-100%);   /* 初期状態は画面外に隠す */
   transition: transform 0.3s ease;
 }
-
-.menu-user-info {
-  display: flex;      
-  align-items: center; 
-  padding: 20px;       
-  border-bottom: 1px solid #ddd; 
-}
-
-.menu-user-icon {
-  width: 60px;      
-  height: 60px;
-  border-radius: 50%;    
-  margin-right: 15px;    
-  flex-shrink: 0;        
- 
-  
-  background-image: url('/images/user_photo.jpg'); 
-  
-  /*画像の切り取り方を指定 */
-  background-size: cover;      
-  background-position: center; 
-  background-repeat: no-repeat; 
-  
-  /* 画像がない時用のバックアップ色 */
-  background-color: #ddd; 
-}
-
-.menu-user-text {
-  display: flex;
-  flex-direction: column; 
-  justify-content: center; 
-}
-
-.menu-user-text .user-id {
-  color: #999;
-  font-size: 12px;
-  margin-top: 4px;
-}
-
-/* サイドメニューのアイコン*/
-.menu-item-icon {
-  width: 28px;
-  height: 28px;
-  margin: 5px 15px 0 15px;
-  object-fit: contain; 
-}
-
-/* 「is-open」クラスがついたら画面内に戻す */
 .side-menu.is-open {
-  transform: translateX(0);
+  transform: translateX(0);       /* is-openがつくと画面内にスライドイン */
 }
+.menu-user-info {
+  display: flex;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #ddd;
+}
+.menu-user-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  margin-right: 15px;
+  flex-shrink: 0;
+  background-image: url('/images/user_photo.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: #ddd;
+}
+.menu-user-text { display: flex; flex-direction: column; justify-content: center; }
+.menu-user-text .user-id { color: #999; font-size: 12px; margin-top: 4px; }
+.menu-item-icon { width: 28px; height: 28px; margin: 5px 15px 0 15px; object-fit: contain; }
+.menu-item { display: flex; align-items: center; padding: 15px 0; cursor: pointer; }
+.menu-item:hover { background-color: #f0e6fa; }
+.menu-item-text { font-size: 15px; }
 
-/* 背景を暗くするレイヤー */
+/* サイドメニュー背景オーバーレイ */
 .menu-overlay {
   position: fixed;
   top: 0;
@@ -241,76 +270,98 @@ body {
   z-index: 999;
 }
 
-
-.spacer { width: 25px; } 
-
-/* 3. 投稿エリアの幅制限） */
+/* =============================
+   メインコンテンツ
+   ============================= */
 .main-content {
-  max-width: 450px;
+  max-width: 600px;
   margin: 0 auto;
-  padding: 10px;
+  padding: 10px 15px 80px; 
 }
-
 .section-title {
   text-align: center;
   font-size: 14px;
   color: #333;
 }
 
-/* 4. 投稿カード */
+/* =============================
+   投稿カード（マイページと共通デザイン）
+   ============================= */
 .post-card {
-  background-color: white;
-  border: 2px solid #000;
-  border-radius: 20px;
+  border: 1px solid #ccc;
+  border-radius: 18px;
   padding: 15px;
   margin-bottom: 15px;
-  display: flex;
-  box-shadow: 0 4px 0px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  background-color: #fff;
 }
 
-/*投稿カード上のユーザーアイコン設定*/
-.user-icon {
+/* カードヘッダー */
+.post-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.post-user-icon {
   width: 40px;
   height: 40px;
+  background-color: #ccc;
   border-radius: 50%;
-  margin-right: 12px;
-  flex-shrink: 0; /* アイコンが横に潰れないように固定 */
-
+  margin-right: 10px;
+  flex-shrink: 0;
   background-image: url('/images/user_photo.jpg');
   background-size: cover;
   background-position: center;
-  background-color: #ddd;
+}
+.post-user-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
-.post-content {
-  flex: 1; /* 残りの幅を全部使う */
+.name-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
+.p-user-name { font-weight: bold; font-size: 14px; }
+.post-time-inline { font-size: 12px; color: #999; }
+.p-user-id { font-size: 12px; color: #999; margin-top: 2px; }
 
-.user-name { font-weight: bold; }
-.post-date { color: #666; font-size: 12px; }
-.post-card .user-id { color: #999; font-size: 11px; margin: 2px 0 8px 0; }
-
-.post-text {
+/* 投稿本文 */
+.post-body {
   font-size: 14px;
-  line-height: 1.4;
-  margin-bottom: 10px;
+  margin-bottom: 15px;
+  line-height: 1.5;
 }
+.post-body p { margin: 0 0 8px 0; }
 
-/* 添付画像（仮） */
+/* 画像プレースホルダー（未実装期間のダミー） */
 .post-image-placeholder {
   width: 100%;
-  height: 180px;
+  height: 200px;
   background-color: #eee;
-  border-radius: 8px;
-  margin-bottom: 10px;
+  border-radius: 10px;
+  margin-top: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.placeholder-text {
+  font-size: 12px;
+  color: #aaa;
 }
 
-/* ハートボタンを右端に */
-.post-actions {
+/* カードフッター */
+.post-footer {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
 }
+.like-area { display: flex; align-items: center; color: #333; }
+.like-num { margin-right: 5px; font-size: 14px; }
 
+/* いいねボタン（画像アイコン使用） */
 .heart-button {
   background: none;
   border: none;
@@ -322,27 +373,23 @@ body {
   border-radius: 50%;
   margin: -8px;
 }
-
 .heart-icon {
   width: 22px;
   height: 22px;
-  object-fit: contain; 
-
+  object-fit: contain;
 }
-
-/* いいねがはねる */
 .heart-icon.liked {
   animation: heartPop 0.3s ease;
 }
-
-/* いいねボタンアニメーション */
 @keyframes heartPop {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.3); }
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.4); }
   100% { transform: scale(1); }
 }
 
-/* 5. 投稿ボタン（フローティング） */
+/* =============================
+   フローティング投稿ボタン
+   ============================= */
 .add-button {
   position: fixed;
   bottom: 20px;
@@ -353,7 +400,7 @@ body {
   border: 1px solid #999;
   border-radius: 50%;
   font-size: 30px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
   cursor: pointer;
 }
 </style>

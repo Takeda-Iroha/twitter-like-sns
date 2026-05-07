@@ -7,15 +7,15 @@ import type { FetchError } from 'ofetch'
 // =========================
 const username = ref('')
 const password = ref('')
-const email = ref('')
 
-const authToken = useCookie<string | null>('auth_token')
+const authToken = useCookie('auth_token')
+const refreshToken = useCookie('auth_refresh_token')
 
 // =========================
 // 2. ログイン処理
 // =========================
 const handleLogin = async () => {
-  if (!username.value || !password.value || !email.value) {
+  if (!username.value || !password.value) {
     alert('すべての項目を入力してください。')
     return
   }
@@ -25,15 +25,16 @@ const handleLogin = async () => {
       method: 'POST',
       body: {
         username: username.value,
-        email: email.value,
         password: password.value
       }
     })
 
     const token = response.data?.accessToken
+    const refresh_token = response.data?.refreshToken
 
     if (token) {
       authToken.value = token
+      refreshToken.value = refresh_token
       alert('ログインに成功しました。')
       navigateTo('/')
     } else {
@@ -72,11 +73,6 @@ const goToSignup = () => navigateTo('/signup')
           <div class="input-group">
             <label>Username</label>
             <input v-model="username" type="text" placeholder="Enter your username" class="custom-input" />
-          </div>
-
-          <div class="input-group">
-            <label>E-mail</label>
-            <input v-model="email" type="email" placeholder="xxx@xxx.com" class="custom-input" />
           </div>
 
           <div class="input-group">
