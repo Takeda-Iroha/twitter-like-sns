@@ -8,8 +8,8 @@ import type { FetchError } from 'ofetch'
 const username = ref('')
 const password = ref('')
 
-const authToken = useCookie('auth_token')
-const refreshToken = useCookie('auth_refresh_token')
+const authToken = useCookie('accessToken')
+const refreshToken = useCookie('refreshToken')
 
 // =========================
 // 2. ログイン処理

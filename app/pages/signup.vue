@@ -1,3 +1,4 @@
+//signup.vue
 <script setup lang="ts">
 import { ref } from 'vue'
 import type { FetchError } from 'ofetch'
@@ -38,8 +39,8 @@ const email = ref('')
 const password = ref('')
 const displayName = ref('')
 
-const authToken = useCookie<string | null>('auth_token')
-const refreshToken = useCookie<string | null>('auth_refresh_token')
+const authToken = useCookie<string | null>('accessToken')
+const refreshToken = useCookie<string | null>('refreshToken')
 
 const goToLogin = () => navigateTo('/login')
 
