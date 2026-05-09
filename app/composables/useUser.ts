@@ -7,29 +7,77 @@ const BASE_URL = 'https://apg-joetsu.tail02904.ts.net/api'
 // ----------------------------------------
 
 // プロフィール情報の型
-// APIのレスポンスのdata部分の形
+// 自分・他人どちらも同じAPIで取得するので型は1つ
 export interface UserProfile {
   id: string
   username: string
-  email: string
-  displayName: string | null  // 未設定の場合はnull
+  displayName: string | null
   bio: string | null
   profileImageUrl: string | null
-  createdAt: string
-  updatedAt: string
+  isFollowing: boolean
+  followersCount: number   // フォロワー数
+  followingCount: number   // フォロー中数
 }
 
-// プロフィール取得レスポンスの型
 interface UserProfileResponse {
   data: UserProfile
 }
 
 // プロフィール更新リクエストの型
-// 全部任意（?）なので一部だけ更新することもできる
 interface UpdateProfileRequest {
   displayName?: string
   bio?: string
   profileImageUrl?: string
+}
+
+interface UpdateProfileResponse {
+  data: UserProfile
+}
+
+// ユーザー投稿一覧の型
+export interface UserPost {
+  id: string
+  userId: string
+  content: string
+  visibility: 'public' | 'followers'
+  replyToId: string | null
+  createdAt: string
+  updatedAt: string
+  isEdited: boolean
+  author: {
+    id: string
+    username: string
+    displayName: string | null
+    bio: string | null
+    profileImageUrl: string | null
+    isFollowing: boolean
+    followersCount: number
+    followingCount: number
+  }
+  likeCount: number
+  replyCount: number
+  isLiked: boolean
+  viewCount: number
+  quoteCount: number
+  isQuoted: boolean
+  quotedMessage: {
+    id: string
+    content: string
+    author: {
+      id: string
+      username: string
+      displayName: string | null
+      profileImageUrl: string | null
+    }
+  } | null
+}
+
+interface UserPostsResponse {
+  data: {
+    messages: UserPost[]
+    nextCursor: string | null
+    hasMore: boolean
+  }
 }
 
 // ----------------------------------------
@@ -37,38 +85,40 @@ interface UpdateProfileRequest {
 // ----------------------------------------
 export const useUser = () => {
 
-  // 自分のプロフィール取得
-  const fetchMyProfile = async (): Promise<UserProfile> => {
+  // ----------------------------------------
+  // ユーザープロフィール取得
+  // 自分・他人どちらも /api/users/{userId} で取得する
+  // ----------------------------------------
+  const fetchUserProfile = async (userId: string): Promise<UserProfile> => {
     const token = useCookie('accessToken').value
 
-    if (!token) {
-      throw new Error('ログインが必要です')
+    // トークンがあればヘッダーに付ける・なくてもOK
+    const headers: Record<string, string> = {}
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
     }
 
     const response = await $fetch<UserProfileResponse>(
-      `${BASE_URL}/users/me`,
-      {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      }
+      `${BASE_URL}/users/${userId}`,
+      { method: 'GET', headers }
     )
-    // response.data の中身だけ返す
     return response.data
   }
 
+  // ----------------------------------------
   // プロフィール更新
-  // PATCHメソッド：一部だけ更新するときに使うHTTPメソッド
+  // PATCHメソッド：指定した項目だけ上書きする
+  // ----------------------------------------
   const updateProfile = async (params: UpdateProfileRequest): Promise<UserProfile> => {
     const token = useCookie('accessToken').value
+    const loggedInUsername = useCookie('username').value
 
     if (!token) {
       throw new Error('ログインが必要です')
     }
 
-    const response = await $fetch<UserProfileResponse>(
-      `${BASE_URL}/users/me`,
+    const response = await $fetch<UpdateProfileResponse>(
+  `${BASE_URL}/users/${loggedInUsername}`,
       {
         method: 'PATCH',
         headers: {
@@ -81,5 +131,41 @@ export const useUser = () => {
     return response.data
   }
 
-  return { fetchMyProfile, updateProfile }
+  // ----------------------------------------
+  // ユーザーの投稿一覧取得
+  // userId：誰の投稿を取得するか
+  // ----------------------------------------
+  const fetchUserPosts = async (
+    username: string,
+    cursor?: string,
+    limit = 20
+  ): Promise<{ posts: UserPost[], nextCursor: string | null, hasMore: boolean }> => {
+    const token = useCookie('accessToken').value
+
+    if (!token) {
+      throw new Error('ログインが必要です')
+    }
+
+    const params = new URLSearchParams()
+    if (cursor) params.append('cursor', cursor)
+    params.append('limit', String(limit))
+
+    const response = await $fetch<UserPostsResponse>(
+      `${BASE_URL}/users/${username}/messages?${params.toString()}`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+    )
+
+    return {
+      posts: response.data.messages,
+      nextCursor: response.data.nextCursor,
+      hasMore: response.data.hasMore
+    }
+  }
+
+  return { fetchUserProfile, updateProfile, fetchUserPosts }
 }

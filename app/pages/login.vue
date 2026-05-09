@@ -1,3 +1,4 @@
+//login.vue
 <script setup lang="ts">
 import { ref } from 'vue'
 import type { FetchError } from 'ofetch'
@@ -10,6 +11,7 @@ const password = ref('')
 
 const authToken = useCookie('accessToken')
 const refreshToken = useCookie('refreshToken')
+const usernameCookie = useCookie('username')
 
 // =========================
 // 2. ログイン処理
@@ -35,6 +37,7 @@ const handleLogin = async () => {
     if (token) {
       authToken.value = token
       refreshToken.value = refresh_token
+      usernameCookie.value = response.data?.user?.username
       alert('ログインに成功しました。')
       navigateTo('/')
     } else {
