@@ -1,0 +1,324 @@
+<!-- app/components/AppSideMenu.vue -->
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
+import { useUser } from '~/composables/useUser'
+import { useAuth } from '~/composables/useAuth'
+
+// ----------------------------------------
+// 親から受け取るprops・親に伝えるemit
+// isOpen：メニューが開いているかどうか
+// close：メニューを閉じるイベントを親に伝える
+// ----------------------------------------
+const props = defineProps<{
+  isOpen: boolean
+}>()
+
+const emit = defineEmits<{
+  close: []
+}>()
+
+const { fetchUserProfile } = useUser()
+const { logout } = useAuth()
+
+// ----------------------------------------
+// ログイン状態の確認
+// Cookieにusernameがあればログイン中と判断
+// ----------------------------------------
+const loggedInUsername = useCookie('username')
+
+// ----------------------------------------
+// ユーザー情報の状態管理
+// ----------------------------------------
+const displayName = ref('')
+const username = ref('')
+const profileImageUrl = ref('')
+
+// ----------------------------------------
+// ログアウト確認モーダルの状態管理
+// ----------------------------------------
+const showLogoutModal = ref(false)
+const isLoggingOut = ref(false)
+const logoutError = ref('')
+
+// ----------------------------------------
+// ユーザー情報をAPIから取得
+// ログイン中のときだけ呼ぶ
+// ----------------------------------------
+const loadUserInfo = async () => {
+  if (!loggedInUsername.value) return
+
+  try {
+    const profile = await fetchUserProfile(loggedInUsername.value)
+    // displayNameがない場合はusernameを表示名として使う
+    displayName.value = profile.displayName || profile.username
+    username.value = profile.username
+    profileImageUrl.value = profile.profileImageUrl ?? ''
+  } catch {
+    // 取得失敗しても画面は壊れないよう無視する
+  }
+}
+
+// ----------------------------------------
+// ログアウト処理
+// ----------------------------------------
+const handleLogout = async () => {
+  isLoggingOut.value = true
+  logoutError.value = ''
+
+  try {
+    await logout()
+    showLogoutModal.value = false
+    // ログアウト後はログインページへ
+    navigateTo('/login')
+  } catch (error: any) {
+    if (error.status === 401) {
+      logoutError.value = '認証エラーが発生しました'
+    } else {
+      logoutError.value = 'ログアウトに失敗しました'
+    }
+  } finally {
+    isLoggingOut.value = false
+  }
+}
+
+// 画面遷移（メニューを閉じてから遷移）
+const goTo = (path: string) => {
+  emit('close')
+  navigateTo(path)
+}
+
+onMounted(() => {
+  loadUserInfo()
+})
+</script>
+
+<template>
+  <!-- サイドメニュー本体 -->
+  <!-- isOpenがtrueのときis-openクラスがついてスライドイン -->
+  <aside class="side-menu" :class="{ 'is-open': props.isOpen }">
+
+    <!-- ユーザー情報エリア -->
+    <div class="menu-user-info">
+      <!-- アイコン画像：クリックでマイページへ -->
+      <div class="menu-user-icon-wrapper" @click="goTo('/mypage')">
+        <img
+          v-if="profileImageUrl"
+          :src="profileImageUrl"
+          class="menu-user-icon"
+          alt="ユーザーアイコン"
+        />
+        <div v-else class="menu-user-icon menu-user-icon--empty" />
+      </div>
+
+      <div class="menu-user-text">
+        <!-- 上段：表示名（displayName） -->
+        <p class="menu-display-name">
+          {{ loggedInUsername ? displayName : 'ゲスト' }}
+        </p>
+        <!-- 下段：ユーザーネーム（@username） -->
+        <p class="menu-username">
+          {{ loggedInUsername ? `@${username}` : '' }}
+        </p>
+      </div>
+    </div>
+
+    <!-- ナビゲーションメニュー -->
+    <nav class="menu-links">
+      <div class="menu-item" @click="goTo('/')">
+        <img src="/images/icon_home.svg" class="menu-item-icon" alt="">
+        <span class="menu-item-text">ホーム</span>
+      </div>
+
+      <div class="menu-item" @click="goTo('/postForm')">
+        <img src="/images/icon_post.svg" class="menu-item-icon" alt="">
+        <span class="menu-item-text">投稿を作成</span>
+      </div>
+
+      <div class="menu-item" @click="goTo('/mypage')">
+        <img src="/images/icon_mypage.svg" class="menu-item-icon" alt="">
+        <span class="menu-item-text">マイページ</span>
+      </div>
+
+      <!-- ログイン中はログアウト・未ログインはログインを表示 -->
+      <div
+        v-if="loggedInUsername"
+        class="menu-item"
+        @click="showLogoutModal = true"
+      >
+        <img src="/images/icon_logout.svg" class="menu-item-icon" alt="">
+        <span class="menu-item-text">ログアウト</span>
+      </div>
+
+      <div
+        v-else
+        class="menu-item"
+        @click="goTo('/login')"
+      >
+        <img src="/images/icon_login.svg" class="menu-item-icon" alt="">
+        <span class="menu-item-text">ログイン</span>
+      </div>
+    </nav>
+  </aside>
+
+  <!-- 背景オーバーレイ：クリックでメニューを閉じる -->
+  <div
+    v-if="props.isOpen"
+    class="menu-overlay"
+    @click="emit('close')"
+  />
+
+  <!-- ログアウト確認モーダル -->
+  <div
+    v-if="showLogoutModal"
+    class="modal-overlay"
+    @click.self="showLogoutModal = false"
+  >
+    <div class="modal">
+      <p class="modal-message">ログアウトしますか？</p>
+      <p v-if="logoutError" class="logout-error">{{ logoutError }}</p>
+      <div class="modal-buttons">
+        <button
+          class="modal-cancel-btn"
+          @click="showLogoutModal = false"
+        >
+          キャンセル
+        </button>
+        <button
+          class="modal-logout-btn"
+          @click="handleLogout"
+          :disabled="isLoggingOut"
+        >
+          {{ isLoggingOut ? 'ログアウト中...' : 'ログアウト' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.side-menu {
+  position: fixed;
+  top: 0; left: 0;
+  width: 280px; height: 100%;
+  background-color: #f9f9f9;
+  z-index: 1000;
+  transform: translateX(-100%);
+  transition: transform 0.3s ease;
+}
+.side-menu.is-open { transform: translateX(0); }
+
+.menu-user-info {
+  display: flex;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #ddd;
+}
+
+/* アイコン画像ラッパー：クリックできることを示すためcursorをpointerに */
+.menu-user-icon-wrapper {
+  flex-shrink: 0;
+  margin-right: 15px;
+  cursor: pointer;
+}
+.menu-user-icon {
+  width: 60px; height: 60px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+.menu-user-icon--empty {
+  background-color: #ddd;
+}
+.menu-user-icon-wrapper:hover .menu-user-icon {
+  opacity: 0.8;
+}
+
+.menu-user-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+/* 表示名（上段）*/
+.menu-display-name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: bold;
+  color: #333;
+}
+/* ユーザーネーム（下段） */
+.menu-username {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #999;
+}
+
+.menu-item-icon { width: 28px; height: 28px; margin: 5px 15px 0 15px; object-fit: contain; }
+.menu-item { display: flex; align-items: center; padding: 15px 0; cursor: pointer; }
+.menu-item:hover { background-color: #f0e6fa; }
+.menu-item-text { font-size: 15px; }
+
+.menu-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background-color: rgba(0,0,0,0.5);
+  z-index: 999;
+}
+
+/* ログアウト確認モーダル */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background-color: rgba(0,0,0,0.5);
+  z-index: 2000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.modal {
+  background: white;
+  border-radius: 16px;
+  padding: 30px 24px 20px;
+  width: 80%;
+  max-width: 320px;
+  text-align: center;
+}
+.modal-message {
+  font-size: 16px;
+  font-weight: bold;
+  margin: 0 0 20px;
+  color: #333;
+}
+.logout-error {
+  color: #f66;
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+.modal-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.modal-cancel-btn {
+  flex: 1;
+  background: none;
+  border: 1px solid #ddd;
+  border-radius: 20px;
+  padding: 10px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.modal-logout-btn {
+  flex: 1;
+  background-color: #f66;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+}
+.modal-logout-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+</style>
