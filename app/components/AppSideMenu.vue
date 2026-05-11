@@ -3,12 +3,8 @@
 import { ref, onMounted } from 'vue'
 import { useUser } from '~/composables/useUser'
 import { useAuth } from '~/composables/useAuth'
+import { useNotification } from '~/composables/useNotification'
 
-// ----------------------------------------
-// 親から受け取るprops・親に伝えるemit
-// isOpen：メニューが開いているかどうか
-// close：メニューを閉じるイベントを親に伝える
-// ----------------------------------------
 const props = defineProps<{
   isOpen: boolean
 }>()
@@ -19,37 +15,29 @@ const emit = defineEmits<{
 
 const { fetchUserProfile } = useUser()
 const { logout } = useAuth()
+const { fetchUnreadCount } = useNotification()
 
-// ----------------------------------------
-// ログイン状態の確認
-// Cookieにusernameがあればログイン中と判断
-// ----------------------------------------
 const loggedInUsername = useCookie('username')
 
-// ----------------------------------------
 // ユーザー情報の状態管理
-// ----------------------------------------
 const displayName = ref('')
 const username = ref('')
 const profileImageUrl = ref('')
 
-// ----------------------------------------
+// 未読通知件数
+const unreadCount = ref(0)
+
 // ログアウト確認モーダルの状態管理
-// ----------------------------------------
 const showLogoutModal = ref(false)
 const isLoggingOut = ref(false)
 const logoutError = ref('')
 
-// ----------------------------------------
 // ユーザー情報をAPIから取得
-// ログイン中のときだけ呼ぶ
-// ----------------------------------------
 const loadUserInfo = async () => {
   if (!loggedInUsername.value) return
 
   try {
     const profile = await fetchUserProfile(loggedInUsername.value)
-    // displayNameがない場合はusernameを表示名として使う
     displayName.value = profile.displayName || profile.username
     username.value = profile.username
     profileImageUrl.value = profile.profileImageUrl ?? ''
@@ -58,9 +46,17 @@ const loadUserInfo = async () => {
   }
 }
 
-// ----------------------------------------
+// 未読通知件数を取得
+const loadUnreadCount = async () => {
+  if (!loggedInUsername.value) return
+  try {
+    unreadCount.value = await fetchUnreadCount()
+  } catch {
+    // 取得失敗しても画面は壊れないよう無視する
+  }
+}
+
 // ログアウト処理
-// ----------------------------------------
 const handleLogout = async () => {
   isLoggingOut.value = true
   logoutError.value = ''
@@ -68,7 +64,6 @@ const handleLogout = async () => {
   try {
     await logout()
     showLogoutModal.value = false
-    // ログアウト後はログインページへ
     navigateTo('/login')
   } catch (error: any) {
     if (error.status === 401) {
@@ -89,17 +84,15 @@ const goTo = (path: string) => {
 
 onMounted(() => {
   loadUserInfo()
+  loadUnreadCount()
 })
 </script>
 
 <template>
-  <!-- サイドメニュー本体 -->
-  <!-- isOpenがtrueのときis-openクラスがついてスライドイン -->
   <aside class="side-menu" :class="{ 'is-open': props.isOpen }">
 
     <!-- ユーザー情報エリア -->
     <div class="menu-user-info">
-      <!-- アイコン画像：クリックでマイページへ -->
       <div class="menu-user-icon-wrapper" @click="goTo('/mypage')">
         <img
           v-if="profileImageUrl"
@@ -111,11 +104,9 @@ onMounted(() => {
       </div>
 
       <div class="menu-user-text">
-        <!-- 上段：表示名（displayName） -->
         <p class="menu-display-name">
           {{ loggedInUsername ? displayName : 'ゲスト' }}
         </p>
-        <!-- 下段：ユーザーネーム（@username） -->
         <p class="menu-username">
           {{ loggedInUsername ? `@${username}` : '' }}
         </p>
@@ -124,6 +115,7 @@ onMounted(() => {
 
     <!-- ナビゲーションメニュー -->
     <nav class="menu-links">
+
       <div class="menu-item" @click="goTo('/')">
         <img src="/images/icon_home.svg" class="menu-item-icon" alt="">
         <span class="menu-item-text">ホーム</span>
@@ -137,6 +129,24 @@ onMounted(() => {
       <div class="menu-item" @click="goTo('/mypage')">
         <img src="/images/icon_mypage.svg" class="menu-item-icon" alt="">
         <span class="menu-item-text">マイページ</span>
+      </div>
+
+      <!-- 通知項目（マイページの下） -->
+      <!-- ログイン中のみ表示 -->
+      <div
+        v-if="loggedInUsername"
+        class="menu-item"
+        @click="goTo('/notifications')"
+      >
+        <!-- バッジを表示するためアイコンをラッパーで囲む -->
+        <div class="menu-item-icon-wrapper">
+          <img src="/images/icon_bell.svg" class="menu-item-icon" alt="">
+          <!-- 未読件数が1以上のときだけバッジを表示 -->
+          <span v-if="unreadCount > 0" class="unread-badge">
+            {{ unreadCount > 99 ? '99+' : unreadCount }}
+          </span>
+        </div>
+        <span class="menu-item-text">通知</span>
       </div>
 
       <!-- ログイン中はログアウト・未ログインはログインを表示 -->
@@ -157,10 +167,11 @@ onMounted(() => {
         <img src="/images/icon_login.svg" class="menu-item-icon" alt="">
         <span class="menu-item-text">ログイン</span>
       </div>
+
     </nav>
   </aside>
 
-  <!-- 背景オーバーレイ：クリックでメニューを閉じる -->
+  <!-- 背景オーバーレイ -->
   <div
     v-if="props.isOpen"
     class="menu-overlay"
@@ -177,10 +188,7 @@ onMounted(() => {
       <p class="modal-message">ログアウトしますか？</p>
       <p v-if="logoutError" class="logout-error">{{ logoutError }}</p>
       <div class="modal-buttons">
-        <button
-          class="modal-cancel-btn"
-          @click="showLogoutModal = false"
-        >
+        <button class="modal-cancel-btn" @click="showLogoutModal = false">
           キャンセル
         </button>
         <button
@@ -214,7 +222,6 @@ onMounted(() => {
   border-bottom: 1px solid #ddd;
 }
 
-/* アイコン画像ラッパー：クリックできることを示すためcursorをpointerに */
 .menu-user-icon-wrapper {
   flex-shrink: 0;
   margin-right: 15px;
@@ -226,36 +233,47 @@ onMounted(() => {
   object-fit: cover;
   display: block;
 }
-.menu-user-icon--empty {
-  background-color: #ddd;
-}
-.menu-user-icon-wrapper:hover .menu-user-icon {
-  opacity: 0.8;
-}
+.menu-user-icon--empty { background-color: #ddd; }
+.menu-user-icon-wrapper:hover .menu-user-icon { opacity: 0.8; }
 
-.menu-user-text {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-/* 表示名（上段）*/
-.menu-display-name {
-  margin: 0;
-  font-size: 15px;
-  font-weight: bold;
-  color: #333;
-}
-/* ユーザーネーム（下段） */
-.menu-username {
-  margin: 4px 0 0;
-  font-size: 12px;
-  color: #999;
-}
+.menu-user-text { display: flex; flex-direction: column; justify-content: center; }
+.menu-display-name { margin: 0; font-size: 15px; font-weight: bold; color: #333; }
+.menu-username { margin: 4px 0 0; font-size: 12px; color: #999; }
 
-.menu-item-icon { width: 28px; height: 28px; margin: 5px 15px 0 15px; object-fit: contain; }
 .menu-item { display: flex; align-items: center; padding: 15px 0; cursor: pointer; }
 .menu-item:hover { background-color: #f0e6fa; }
 .menu-item-text { font-size: 15px; }
+
+/* 通常のアイコン（バッジなし） */
+.menu-item-icon { width: 28px; height: 28px; margin: 5px 15px 0 15px; object-fit: contain; }
+
+/* 通知アイコン用ラッパー（バッジを重ねるためにpositionを使う） */
+.menu-item-icon-wrapper {
+  position: relative;
+  width: 28px; height: 28px;
+  margin: 5px 15px 0 15px;
+  flex-shrink: 0;
+}
+.menu-item-icon-wrapper .menu-item-icon {
+  /* ラッパー内ではmarginをリセット */
+  margin: 0;
+  width: 100%; height: 100%;
+}
+
+/* 未読件数バッジ */
+.unread-badge {
+  position: absolute;
+  top: -4px; right: -6px;
+  background-color: #e0245e;
+  color: white;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 1px 4px;
+  min-width: 16px;
+  text-align: center;
+  line-height: 1.4;
+}
 
 .menu-overlay {
   position: fixed;
@@ -284,22 +302,9 @@ onMounted(() => {
   max-width: 320px;
   text-align: center;
 }
-.modal-message {
-  font-size: 16px;
-  font-weight: bold;
-  margin: 0 0 20px;
-  color: #333;
-}
-.logout-error {
-  color: #f66;
-  font-size: 13px;
-  margin: 0 0 12px;
-}
-.modal-buttons {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-}
+.modal-message { font-size: 16px; font-weight: bold; margin: 0 0 20px; color: #333; }
+.logout-error { color: #f66; font-size: 13px; margin: 0 0 12px; }
+.modal-buttons { display: flex; gap: 10px; justify-content: center; }
 .modal-cancel-btn {
   flex: 1;
   background: none;

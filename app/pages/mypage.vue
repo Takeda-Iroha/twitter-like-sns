@@ -1,14 +1,33 @@
 <!-- app/pages/mypage.vue -->
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useUser } from '~/composables/useUser'
 import type { UserProfile, UserPost } from '~/composables/useUser'
 
 const isMenuOpen = ref(false)
 const { fetchUserProfile, updateProfile, fetchUserPosts } = useUser()
 
+// ----------------------------------------
+// 自分のusernameをCookieから取得
+// ----------------------------------------
 const loggedInUsername = useCookie('username').value
-const isMyPage = ref(true)
+
+// ----------------------------------------
+// URLパラメータからusernameを取得
+// /users/johndoe にアクセスしたとき
+// route.params.username に「johndoe」が入る
+// ただし /mypage の場合はパラメータがないので
+// loggedInUsername を使う
+// ----------------------------------------
+const route = useRoute()
+const targetUsername = computed(() => {
+  return (route.params.username as string) || loggedInUsername || ''
+})
+
+// 自分のページかどうかを自動判定
+const isMyPage = computed(() => {
+  return targetUsername.value === loggedInUsername
+})
 
 const profile = ref<UserProfile | null>(null)
 const isLoading = ref(false)
@@ -29,13 +48,13 @@ const loadProfile = async () => {
   isLoading.value = true
   errorMessage.value = ''
 
-  if (!loggedInUsername) {
+  if (!targetUsername.value) {
     navigateTo('/login')
     return
   }
 
   try {
-    profile.value = await fetchUserProfile(loggedInUsername)
+    profile.value = await fetchUserProfile(targetUsername.value)
     await loadUserPosts()
   } catch (error: any) {
     if (error.status === 401) {
@@ -51,13 +70,32 @@ const loadProfile = async () => {
 }
 
 const loadUserPosts = async () => {
-  if (!loggedInUsername) return
+  if (!targetUsername.value) return
   isPostsLoading.value = true
   postsError.value = ''
 
   try {
-    const result = await fetchUserPosts(loggedInUsername!)
-    userPosts.value = result.posts
+    const result = await fetchUserPosts(targetUsername.value)
+
+    // ----------------------------------------
+    // 公開範囲による投稿フィルタリング
+    // isMyPage：全投稿表示
+    // フォロワーの場合：public + followers を表示
+    // 非フォロワーの場合：public のみ表示
+    // ----------------------------------------
+    if (isMyPage.value) {
+      userPosts.value = result.posts
+    } else if (profile.value?.isFollowing) {
+      // フォロワーはpublic・followersの投稿を表示
+      userPosts.value = result.posts.filter(
+        p => p.visibility === 'public' || p.visibility === 'followers'
+      )
+    } else {
+      // 非フォロワーはpublicのみ
+      userPosts.value = result.posts.filter(
+        p => p.visibility === 'public'
+      )
+    }
   } catch (error: any) {
     postsError.value = '投稿を読み込めませんでした'
   } finally {
@@ -110,6 +148,11 @@ const handleUpdateProfile = async () => {
   } finally {
     isUpdating.value = false
   }
+}
+
+// 投稿詳細ページへ遷移
+const goToPostDetail = (postId: string) => {
+  navigateTo(`/posts/${postId}`)
 }
 
 onMounted(() => {
@@ -188,12 +231,16 @@ onMounted(() => {
 
               <div class="post-footer">
                 <span class="post-time">{{ formatDate(post.createdAt) }}に投稿</span>
-                <div class="like-area">
-                  <span v-if="post.likeCount > 0" class="like-num">{{ post.likeCount }}</span>
-                  <button class="heart-button">
-                    <img v-if="post.isLiked" src="/images/icon_heart_fill.svg" class="heart-icon liked" alt="いいね済み" />
-                    <img v-else src="/images/icon_heart.svg" class="heart-icon" alt="いいね" />
-                  </button>
+                <div class="post-footer-right">
+                  <!-- 詳細を見るボタン -->
+                  <button class="detail-btn" @click="goToPostDetail(post.id)">詳細を見る</button>
+                  <div class="like-area">
+                    <span v-if="post.likeCount > 0" class="like-num">{{ post.likeCount }}</span>
+                    <button class="heart-button">
+                      <img v-if="post.isLiked" src="/images/icon_heart_fill.svg" class="heart-icon liked" alt="いいね済み" />
+                      <img v-else src="/images/icon_heart.svg" class="heart-icon" alt="いいね" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -202,8 +249,8 @@ onMounted(() => {
       </template>
     </div>
 
-    <!-- 編集モーダル -->
-    <div v-if="isEditModalOpen" class="modal-overlay" @click.self="closeEditModal">
+    <!-- 編集モーダル（自分のページのみ表示） -->
+    <div v-if="isEditModalOpen && isMyPage" class="modal-overlay" @click.self="closeEditModal">
       <div class="modal">
         <div class="modal-header">
           <h3 class="modal-title">プロフィールを編集</h3>
@@ -240,56 +287,18 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.mypage-wrapper {
-  max-width: 600px;
-  margin: 0 auto;
-  background-color: #fff;
-  min-height: 100vh;
-  border-left: 1px solid #ddd;
-  border-right: 1px solid #ddd;
-}
-.cover-image {
-  width: 100%; height: 160px;
-  background-color: #eee;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  overflow: hidden;
-}
+.mypage-wrapper { max-width: 600px; margin: 0 auto; background-color: #fff; min-height: 100vh; border-left: 1px solid #ddd; border-right: 1px solid #ddd; }
+.cover-image { width: 100%; height: 160px; background-color: #eee; display: flex; justify-content: center; align-items: center; overflow: hidden; }
 .cover-img { width: 100%; height: 100%; object-fit: cover; }
 .cover-placeholder { color: #999; font-size: 14px; }
 .profile-main { padding: 0 20px 20px; }
 .avatar-wrapper { margin-top: -45px; margin-bottom: 10px; }
-.avatar {
-  width: 90px; height: 90px;
-  border-radius: 50%;
-  border: 4px solid #fff;
-  object-fit: cover;
-  display: block;
-}
+.avatar { width: 90px; height: 90px; border-radius: 50%; border: 4px solid #fff; object-fit: cover; display: block; }
 .avatar--empty { background-color: #ccc; }
 .profile-action { display: flex; justify-content: flex-end; margin-bottom: 10px; }
-.edit-btn {
-  background: none;
-  border: 1px solid #c65bed;
-  border-radius: 20px;
-  padding: 6px 16px;
-  font-size: 13px;
-  color: #c65bed;
-  cursor: pointer;
-  font-weight: bold;
-}
+.edit-btn { background: none; border: 1px solid #c65bed; border-radius: 20px; padding: 6px 16px; font-size: 13px; color: #c65bed; cursor: pointer; font-weight: bold; }
 .edit-btn:hover { background-color: #f5e6ff; }
-.follow-btn {
-  background-color: #c65bed;
-  border: none;
-  border-radius: 20px;
-  padding: 6px 16px;
-  font-size: 13px;
-  color: white;
-  cursor: pointer;
-  font-weight: bold;
-}
+.follow-btn { background-color: #c65bed; border: none; border-radius: 20px; padding: 6px 16px; font-size: 13px; color: white; cursor: pointer; font-weight: bold; }
 .user-name { margin: 0; font-size: 22px; }
 .user-id { margin: 5px 0 10px; color: #888; font-size: 14px; }
 .bio { font-size: 14px; line-height: 1.6; color: #333; margin: 0 0 12px; }
@@ -300,14 +309,7 @@ onMounted(() => {
 .status-text { text-align: center; color: #999; font-size: 14px; padding: 30px 0; }
 .status-text.error { color: #f66; }
 .post-list { padding: 0 15px 50px; }
-.post-card {
-  border: 1px solid #ccc;
-  border-radius: 18px;
-  padding: 15px;
-  margin-bottom: 15px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-  background-color: #fff;
-}
+.post-card { border: 1px solid #ccc; border-radius: 18px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); background-color: #fff; }
 .post-header { display: flex; align-items: center; margin-bottom: 10px; }
 .post-user-icon { width: 40px; height: 40px; border-radius: 50%; margin-right: 10px; flex-shrink: 0; object-fit: cover; display: block; }
 .post-user-icon--empty { background-color: #ccc; }
@@ -319,26 +321,16 @@ onMounted(() => {
 .post-body { font-size: 14px; margin-bottom: 15px; line-height: 1.5; }
 .post-body p { margin: 0; }
 .post-footer { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #aaa; }
+.post-footer-right { display: flex; align-items: center; gap: 8px; }
+.detail-btn { background: none; border: 1px solid #c65bed; border-radius: 14px; padding: 4px 10px; font-size: 11px; color: #c65bed; cursor: pointer; }
+.detail-btn:hover { background-color: #f5e6ff; }
 .like-area { display: flex; align-items: center; color: #333; }
 .like-num { margin-right: 5px; font-size: 14px; }
 .heart-button { background: none; border: none; padding: 8px; cursor: pointer; display: flex; align-items: center; border-radius: 50%; margin: -8px; }
 .heart-icon { width: 22px; height: 22px; object-fit: contain; }
 .heart-icon.liked { animation: heartPop 0.3s ease; }
-@keyframes heartPop {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.4); }
-  100% { transform: scale(1); }
-}
-.modal-overlay {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  background-color: rgba(0,0,0,0.5);
-  z-index: 2000;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
+@keyframes heartPop { 0% { transform: scale(1); } 50% { transform: scale(1.4); } 100% { transform: scale(1); } }
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 2000; display: flex; justify-content: center; align-items: center; }
 .modal { background: white; border-radius: 16px; width: 90%; max-width: 480px; max-height: 90vh; overflow-y: auto; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #eee; position: sticky; top: 0; background: white; z-index: 1; }
 .modal-title { margin: 0; font-size: 16px; font-weight: bold; }

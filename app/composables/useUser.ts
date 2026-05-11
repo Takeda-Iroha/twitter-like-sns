@@ -167,5 +167,34 @@ export const useUser = () => {
     }
   }
 
-  return { fetchUserProfile, updateProfile, fetchUserPosts }
+  // フォロー申請レスポンスの型
+interface FollowRequestResponse {
+  data: {
+    id: number
+    followerId: string
+    followingId: string
+    status: 'pending' | 'approved' | 'rejected'
+    createdAt: string
+    updatedAt: string
+  }
+}
+
+// フォロー申請
+// targetUserId：フォローしたいユーザーのID
+const requestFollow = async (targetUserId: string): Promise<FollowRequestResponse> => {
+  const token = useCookie('accessToken').value
+  if (!token) throw new Error('ログインが必要です')
+
+  const response = await $fetch<FollowRequestResponse>(
+    `${BASE_URL}/follows/${targetUserId}`,
+    {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` }
+    }
+  )
+  return response
+}
+
+
+  return { fetchUserProfile, updateProfile, fetchUserPosts, requestFollow }
 }
