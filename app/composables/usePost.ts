@@ -89,6 +89,20 @@ interface RepliesResponse {
   }
 }
 
+// 投稿編集レスポンスの型
+interface UpdatePostResponse {
+  data: {
+    id: string
+    userId: string
+    content: string
+    visibility: 'public' | 'followers' | 'private'
+    replyToId: string | null
+    createdAt: string
+    updatedAt: string
+    isEdited: boolean
+  }
+}
+
 const BASE_URL = 'https://apg-joetsu.tail02904.ts.net/api'
 
 export const usePost = () => {
@@ -250,6 +264,42 @@ export const usePost = () => {
     return response.data
   }
 
+  // 投稿編集
+const updatePost = async (
+  postId: string,
+  content: string,
+  visibility: 'public' | 'followers' | 'private'
+): Promise<void> => {
+  const token = useCookie('accessToken').value
+  if (!token) throw new Error('ログインが必要です')
+
+  await $fetch<UpdatePostResponse>(
+    `${BASE_URL}/messages/${postId}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: { content, visibility }
+    }
+  )
+}
+
+// 投稿削除
+const deletePost = async (postId: string): Promise<void> => {
+  const token = useCookie('accessToken').value
+  if (!token) throw new Error('ログインが必要です')
+
+  await $fetch(
+    `${BASE_URL}/messages/${postId}`,
+    {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    }
+  )
+}
+
   return {
     fetchPublicTimeline,
     fetchHomeTimeline,
@@ -260,5 +310,7 @@ export const usePost = () => {
     createQuote,
     deleteQuote,
     fetchReplies
+    ,updatePost,
+    deletePost
   }
 }

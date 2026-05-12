@@ -38,7 +38,6 @@ const handleLogin = async () => {
       authToken.value = token
       refreshToken.value = refresh_token
       usernameCookie.value = response.data?.user?.username
-      alert('ログインに成功しました。')
       navigateTo('/')
     } else {
       console.error('Unexpected response structure:', response)
