@@ -111,14 +111,13 @@ export const useUser = () => {
   // ----------------------------------------
   const updateProfile = async (params: UpdateProfileRequest): Promise<UserProfile> => {
     const token = useCookie('accessToken').value
-    const loggedInUsername = useCookie('username').value
 
     if (!token) {
       throw new Error('ログインが必要です')
     }
 
     const response = await $fetch<UpdateProfileResponse>(
-  `${BASE_URL}/users/${loggedInUsername}`,
+  `${BASE_URL}/users/me`,
       {
         method: 'PATCH',
         headers: {

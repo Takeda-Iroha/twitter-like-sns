@@ -103,15 +103,7 @@ const loadUserPosts = async () => {
   }
 }
 
-const formatDate = (dateStr: string): string => {
-  const date = new Date(dateStr)
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  const h = String(date.getHours()).padStart(2, '0')
-  const min = String(date.getMinutes()).padStart(2, '0')
-  return `${y}/${m}/${d} ${h}:${min}`
-}
+
 
 const openEditModal = () => {
   if (!profile.value) return
@@ -150,10 +142,7 @@ const handleUpdateProfile = async () => {
   }
 }
 
-// 投稿詳細ページへ遷移
-const goToPostDetail = (postId: string) => {
-  navigateTo(`/posts/${postId}`)
-}
+
 
 onMounted(() => {
   loadProfile()
@@ -212,39 +201,11 @@ onMounted(() => {
           <p v-else-if="postsError" class="status-text error">{{ postsError }}</p>
           <p v-else-if="userPosts.length === 0" class="status-text">投稿がありません</p>
 
-          <article v-else v-for="post in userPosts" :key="post.id" class="post-card">
-            <div class="post-inner">
-              <div class="post-header">
-                <img v-if="post.author.profileImageUrl" :src="post.author.profileImageUrl" class="post-user-icon" alt="" />
-                <div v-else class="post-user-icon post-user-icon--empty" />
-                <div class="post-user-info">
-                  <span class="p-user-name">{{ post.author.displayName || post.author.username }}</span>
-                  <span class="p-user-id">@{{ post.author.username }}</span>
-                </div>
-                <div v-if="isMyPage" class="post-menu">
-                  <span class="menu-text">編集</span>
-                  <span class="menu-text delete">削除</span>
-                </div>
-              </div>
-
-              <div class="post-body"><p>{{ post.content }}</p></div>
-
-              <div class="post-footer">
-                <span class="post-time">{{ formatDate(post.createdAt) }}に投稿</span>
-                <div class="post-footer-right">
-                  <!-- 詳細を見るボタン -->
-                  <button class="detail-btn" @click="goToPostDetail(post.id)">詳細を見る</button>
-                  <div class="like-area">
-                    <span v-if="post.likeCount > 0" class="like-num">{{ post.likeCount }}</span>
-                    <button class="heart-button">
-                      <img v-if="post.isLiked" src="/images/icon_heart_fill.svg" class="heart-icon liked" alt="いいね済み" />
-                      <img v-else src="/images/icon_heart.svg" class="heart-icon" alt="いいね" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </article>
+          <PostCard
+            v-for="post in userPosts"
+            :key="post.id"
+            :post="(post as any)"
+          />
         </main>
       </template>
     </div>
@@ -309,26 +270,7 @@ onMounted(() => {
 .status-text { text-align: center; color: #999; font-size: 14px; padding: 30px 0; }
 .status-text.error { color: #f66; }
 .post-list { padding: 0 15px 50px; }
-.post-card { border: 1px solid #ccc; border-radius: 18px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); background-color: #fff; }
-.post-header { display: flex; align-items: center; margin-bottom: 10px; }
-.post-user-icon { width: 40px; height: 40px; border-radius: 50%; margin-right: 10px; flex-shrink: 0; object-fit: cover; display: block; }
-.post-user-icon--empty { background-color: #ccc; }
-.post-user-info { flex: 1; display: flex; flex-direction: column; }
-.p-user-name { font-weight: bold; font-size: 14px; }
-.p-user-id { font-size: 12px; color: #999; }
-.post-menu { font-size: 12px; color: #999; display: flex; gap: 10px; cursor: pointer; }
-.delete { color: #f66; }
-.post-body { font-size: 14px; margin-bottom: 15px; line-height: 1.5; }
-.post-body p { margin: 0; }
-.post-footer { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #aaa; }
-.post-footer-right { display: flex; align-items: center; gap: 8px; }
-.detail-btn { background: none; border: 1px solid #c65bed; border-radius: 14px; padding: 4px 10px; font-size: 11px; color: #c65bed; cursor: pointer; }
-.detail-btn:hover { background-color: #f5e6ff; }
-.like-area { display: flex; align-items: center; color: #333; }
-.like-num { margin-right: 5px; font-size: 14px; }
-.heart-button { background: none; border: none; padding: 8px; cursor: pointer; display: flex; align-items: center; border-radius: 50%; margin: -8px; }
-.heart-icon { width: 22px; height: 22px; object-fit: contain; }
-.heart-icon.liked { animation: heartPop 0.3s ease; }
+
 @keyframes heartPop { 0% { transform: scale(1); } 50% { transform: scale(1.4); } 100% { transform: scale(1); } }
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 2000; display: flex; justify-content: center; align-items: center; }
 .modal { background: white; border-radius: 16px; width: 90%; max-width: 480px; max-height: 90vh; overflow-y: auto; }

@@ -1,22 +1,38 @@
 <!-- app/pages/postForm.vue -->
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { usePost } from '~/composables/usePost'
+import { useUser } from '~/composables/useUser'
 
 const isMenuOpen = ref(false)
 const { createPost } = usePost()
+const { fetchUserProfile } = useUser()
 const router = useRouter()
 
 const postContent = ref('')
-const visibility = ref<'public' | 'followers'>('public')
+const visibility = ref<'public' | 'followers' | 'private'>('public')
 const showVisibilityMenu = ref(false)
 const attachedImages = ref<File[]>([])
 const previewUrls = ref<string[]>([])
 const isSubmitting = ref(false)
 const errorMessage = ref('')
 
+// 自分のアイコン画像を取得
+const myProfileImageUrl = ref('')
+const loggedInUsername = useCookie('username').value
+
+const loadMyProfile = async () => {
+  if (!loggedInUsername) return
+  try {
+    const profile = await fetchUserProfile(loggedInUsername)
+    myProfileImageUrl.value = profile.profileImageUrl ?? ''
+  } catch { /* 失敗しても問題なし */ }
+}
+
 const visibilityLabel = computed(() => {
-  return visibility.value === 'public' ? '🌍 全員' : '👥 フォロワーのみ'
+  if (visibility.value === 'public') return '🌍 全員'
+  if (visibility.value === 'followers') return '👥 フォロワーのみ'
+  return '🔒 自分のみ'
 })
 
 const handleImageSelect = (event: Event) => {
@@ -62,6 +78,10 @@ const handleCreatePost = async () => {
 }
 
 const goBack = () => { router.back() }
+
+onMounted(() => {
+  loadMyProfile()
+})
 </script>
 
 <template>
@@ -91,7 +111,15 @@ const goBack = () => { router.back() }
       <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
 
       <div class="post-form-content">
-        <div class="user-icon"></div>
+        <!-- APIから取得したアイコン画像を表示 -->
+        <img
+          v-if="myProfileImageUrl"
+          :src="myProfileImageUrl"
+          class="user-icon"
+          alt="自分のアイコン"
+        />
+        <div v-else class="user-icon user-icon--empty" />
+
         <textarea v-model="postContent" class="post-textarea" placeholder="今なにしてる？"></textarea>
       </div>
 
@@ -124,16 +152,17 @@ const goBack = () => { router.back() }
               class="visibility-option"
               :class="{ 'active': visibility === 'public' }"
               @click="visibility = 'public'; showVisibilityMenu = false"
-            >
-              🌍 全員
-            </div>
+            >🌍 全員</div>
             <div
               class="visibility-option"
               :class="{ 'active': visibility === 'followers' }"
               @click="visibility = 'followers'; showVisibilityMenu = false"
-            >
-              👥 フォロワーのみ
-            </div>
+            >👥 フォロワーのみ</div>
+            <div
+              class="visibility-option"
+              :class="{ 'active': visibility === 'private' }"
+              @click="visibility = 'private'; showVisibilityMenu = false"
+            >🔒 自分のみ</div>
           </div>
         </div>
       </div>
@@ -155,8 +184,8 @@ body {
   max-width: 600px;
   margin: 0 auto;
   padding: 0 12px;
-  border-left: 1px solid rgba(198, 91, 237, 0.3);
-  border-right: 1px solid rgba(198, 91, 237, 0.3);
+  border-left: 1px solid #ddd;
+  border-right: 1px solid #ddd;
   background-color: #fff;
   min-height: calc(100vh - 60px);
 }
@@ -169,8 +198,9 @@ body {
 .char-count.error { color: red; font-weight: bold; }
 .error-message { color: #f66; font-size: 13px; text-align: center; margin: 0 0 8px; }
 .post-form-content { display: flex; padding: 10px; gap: 12px; }
-.user-icon { width: 60px; height: 60px; border-radius: 50%; flex-shrink: 0; background-image: url('/images/user_photo.jpg'); background-size: cover; background-position: center; background-color: #ddd; }
-.post-textarea { flex: 1; border: none; outline: none; font-size: 18px; resize: none; min-height: 200px; padding-top: 10px; background-color: transparent; }
+.user-icon { width: 60px; height: 60px; border-radius: 50%; flex-shrink: 0; object-fit: cover; display: block; }
+.user-icon--empty { width: 60px; height: 60px; border-radius: 50%; flex-shrink: 0; background-color: #ddd; }
+.post-textarea { flex: 1; border: none; outline: none; font-size: 18px; resize: none; min-height: 200px; padding-top: 10px; background-color: transparent; font-family: inherit; }
 .image-preview-list { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 10px 10px; }
 .image-preview-item { position: relative; width: calc(50% - 4px); }
 .preview-image { width: 100%; height: 150px; object-fit: cover; border-radius: 10px; }

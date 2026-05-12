@@ -2,10 +2,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { usePost } from '~/composables/usePost'
-import type { Post } from '~/composables/usePost'
+import type { Post, Reply } from '~/composables/usePost'
+import { useUser } from '~/composables/useUser'
 
 const isMenuOpen = ref(false)
-const { fetchPostDetail, addLike, removeLike, createQuote, deleteQuote } = usePost()
+const { fetchPostDetail, addLike, removeLike, createQuote, deleteQuote, createPost, fetchReplies } = usePost()
+const { fetchUserProfile } = useUser()
 
 const route = useRoute()
 const postId = route.params.id as string
@@ -29,6 +31,19 @@ const showQuoteModal = ref(false)
 const quoteContent = ref('')
 const quoteError = ref('')
 
+// リプライ関連の状態管理
+const replies = ref<Reply[]>([])
+const isRepliesLoading = ref(false)
+const repliesError = ref('')
+const replyContent = ref('')
+const isReplying = ref(false)
+const replyError = ref('')
+const replyCount = ref(0)
+
+// 自分のアイコン（リプライ入力欄用）
+const myProfileImageUrl = ref('')
+const loggedInUsername = useCookie('username').value
+
 const loadPost = async () => {
   isLoading.value = true
   errorMessage.value = ''
@@ -39,6 +54,7 @@ const loadPost = async () => {
     likeCount.value = data.likeCount
     isQuoted.value = data.isQuoted
     quoteCount.value = data.quoteCount
+    replyCount.value = data.replyCount
   } catch (error: any) {
     if (error.status === 404) {
       errorMessage.value = '投稿が見つかりません'
@@ -50,6 +66,28 @@ const loadPost = async () => {
   } finally {
     isLoading.value = false
   }
+}
+
+// リプライ一覧取得
+const loadReplies = async () => {
+  isRepliesLoading.value = true
+  repliesError.value = ''
+  try {
+    replies.value = await fetchReplies(postId)
+  } catch {
+    repliesError.value = 'リプライを読み込めませんでした'
+  } finally {
+    isRepliesLoading.value = false
+  }
+}
+
+// 自分のアイコン取得
+const loadMyProfile = async () => {
+  if (!loggedInUsername) return
+  try {
+    const profile = await fetchUserProfile(loggedInUsername)
+    myProfileImageUrl.value = profile.profileImageUrl ?? ''
+  } catch { /* 失敗しても問題なし */ }
 }
 
 // いいね処理
@@ -80,12 +118,11 @@ const openQuoteModal = () => {
   showQuoteModal.value = true
 }
 
-// 引用リツイート送信処理
+// 引用リツイート送信
 const handleQuote = async () => {
   if (!quoteContent.value.trim()) return
   isQuoting.value = true
   quoteError.value = ''
-
   try {
     await createQuote(postId, quoteContent.value)
     isQuoted.value = true
@@ -104,17 +141,44 @@ const handleQuote = async () => {
   }
 }
 
-// 引用リツイート取り消し処理
+// 引用リツイート取り消し
 const handleDeleteQuote = async () => {
   isQuoting.value = true
   try {
     await deleteQuote(postId)
     isQuoted.value = false
     quoteCount.value = Math.max(0, quoteCount.value - 1)
-  } catch (error: any) {
+  } catch {
     alert('引用リツイートの取り消しに失敗しました')
   } finally {
     isQuoting.value = false
+  }
+}
+
+// リプライ送信処理
+// createPost に replyToId を渡すだけでリプライになる
+const handleReply = async () => {
+  if (!replyContent.value.trim()) return
+  isReplying.value = true
+  replyError.value = ''
+  try {
+    await createPost({
+      content: replyContent.value,
+      visibility: 'public',
+      replyToId: postId
+    })
+    replyContent.value = ''
+    replyCount.value += 1
+    // 送信後にリプライ一覧を再取得
+    await loadReplies()
+  } catch (error: any) {
+    if (error.status === 401) {
+      replyError.value = 'ログインが必要です'
+    } else {
+      replyError.value = 'リプライに失敗しました'
+    }
+  } finally {
+    isReplying.value = false
   }
 }
 
@@ -128,8 +192,20 @@ const formatDate = (dateStr: string): string => {
   return `${y}/${m}/${d} ${h}:${min}`
 }
 
-onMounted(() => {
-  loadPost()
+const formatRelativeTime = (date: Date): string => {
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMin = Math.floor(diffMs / 1000 / 60)
+  if (diffMin < 1) return 'たった今'
+  if (diffMin < 60) return `${diffMin}分前`
+  if (diffMin < 60 * 24) return `${Math.floor(diffMin / 60)}時間前`
+  return `${Math.floor(diffMin / 60 / 24)}日前`
+}
+
+onMounted(async () => {
+  await loadPost()
+  await loadReplies()
+  await loadMyProfile()
 })
 </script>
 
@@ -150,7 +226,7 @@ onMounted(() => {
 
       <template v-else-if="post">
 
-        <!-- 投稿者情報：クリックでプロフィールへ -->
+        <!-- 投稿者情報 -->
         <div
           class="author-section"
           @click="navigateTo(`/users/${post.author.username}`)"
@@ -199,10 +275,10 @@ onMounted(() => {
 
         <hr class="divider" />
 
-        <!-- 統計情報：リプライ数→引用数→いいね数→閲覧数 -->
+        <!-- 統計情報 -->
         <div class="stats-row">
           <div class="stat-item">
-            <span class="stat-num">{{ post.replyCount }}</span>
+            <span class="stat-num">{{ replyCount }}</span>
             <span class="stat-label">リプライ</span>
           </div>
           <div class="stat-item">
@@ -210,7 +286,7 @@ onMounted(() => {
             <span class="stat-label">引用</span>
           </div>
           <div class="stat-item">
-            <span class="stat-num" :class="{ 'liked-color': isLiked }">{{ likeCount }}</span>
+            <span class="stat-num" :class="{ 'active-color': isLiked }">{{ likeCount }}</span>
             <span class="stat-label">いいね</span>
           </div>
           <div class="stat-item">
@@ -224,34 +300,33 @@ onMounted(() => {
         <!-- アクションボタン行 -->
         <div class="action-row">
 
-          <!-- リプライボタン（未実装） -->
-          <button class="action-btn disabled-btn" disabled>
-            <span>💬</span>
-            <span class="coming-soon">リプライ（準備中）</span>
-          </button>
-
           <!-- 引用リツイートボタン -->
           <button
             class="action-btn"
-            :class="{ 'quoted': isQuoted }"
+            :class="{ 'is-active': isQuoted }"
             :disabled="isQuoting"
             @click="isQuoted ? handleDeleteQuote() : openQuoteModal()"
           >
-            <img src="/images/icon_retweet.svg" class="action-icon" alt="引用リツイート" />
+            <img
+              src="/images/icon_retweet.svg"
+              class="action-icon"
+              :class="{ 'icon-purple': isQuoted }"
+              alt="引用リツイート"
+            />
             <span>{{ isQuoted ? '引用済み' : '引用' }}</span>
           </button>
 
           <!-- いいねボタン -->
           <button
             class="action-btn"
-            :class="{ 'liked': isLiked }"
+            :class="{ 'is-active': isLiked }"
             :disabled="isLiking"
             @click="handleLike"
           >
             <img
               v-if="isLiked"
               src="/images/icon_heart_fill.svg"
-              class="action-icon"
+              class="action-icon icon-purple"
               alt="いいね済み"
             />
             <img
@@ -265,6 +340,97 @@ onMounted(() => {
 
         </div>
 
+        <hr class="divider" />
+
+        <!-- リプライ入力欄 -->
+        <div class="reply-input-section">
+          <div class="reply-input-row">
+            <img
+              v-if="myProfileImageUrl"
+              :src="myProfileImageUrl"
+              class="reply-my-icon"
+              alt="自分のアイコン"
+            />
+            <div v-else class="reply-my-icon reply-my-icon--empty" />
+            <div class="reply-input-area">
+              <textarea
+                v-model="replyContent"
+                class="reply-textarea"
+                placeholder="返信を入力..."
+                rows="3"
+                maxlength="250"
+              ></textarea>
+              <div class="reply-char-count" :class="{ 'error': replyContent.length > 250 }">
+                {{ replyContent.length }} / 250
+              </div>
+            </div>
+          </div>
+          <p v-if="replyError" class="reply-error">{{ replyError }}</p>
+          <div class="reply-submit-row">
+            <button
+              class="reply-submit-btn"
+              :disabled="!replyContent.trim() || replyContent.length > 250 || isReplying"
+              @click="handleReply"
+            >
+              {{ isReplying ? '送信中...' : '返信する' }}
+            </button>
+          </div>
+        </div>
+
+        <hr class="divider" />
+
+        <!-- リプライ一覧（ツリー表示） -->
+        <div class="replies-section">
+          <p v-if="isRepliesLoading" class="status-text">読み込み中...</p>
+          <p v-else-if="repliesError" class="status-text error">{{ repliesError }}</p>
+          <p v-else-if="replies.length === 0" class="status-text">まだリプライはありません</p>
+
+          <div
+            v-else
+            v-for="reply in replies"
+            :key="reply.id"
+            class="reply-item"
+            @click="navigateTo(`/posts/${reply.id}`)"
+          >
+            <!-- ツリーライン -->
+            <div class="reply-tree-line" />
+
+            <div class="reply-content">
+              <div class="reply-header">
+                <div
+                  class="reply-icon-wrapper"
+                  @click.stop="navigateTo(`/users/${reply.author.username}`)"
+                >
+                  <img
+                    v-if="reply.author.profileImageUrl"
+                    :src="reply.author.profileImageUrl"
+                    class="reply-author-icon"
+                    alt=""
+                  />
+                  <div v-else class="reply-author-icon reply-author-icon--empty" />
+                </div>
+                <div class="reply-author-info">
+                  <span class="reply-author-name">
+                    {{ reply.author.displayName || reply.author.username }}
+                  </span>
+                  <span class="reply-author-time">
+                    ・{{ formatRelativeTime(new Date(reply.createdAt)) }}
+                  </span>
+                </div>
+              </div>
+
+              <p class="reply-text">{{ reply.content }}</p>
+
+              <div class="reply-stats">
+                <span class="reply-stat">
+                  <img src="/images/icon_heart.svg" class="reply-stat-icon" alt="" />
+                  {{ reply.likeCount > 0 ? reply.likeCount : '' }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </template>
     </main>
 
@@ -276,14 +442,10 @@ onMounted(() => {
           <button class="modal-close-btn" @click="showQuoteModal = false">×</button>
         </div>
         <div class="modal-body">
-          <!-- 引用元の投稿プレビュー -->
           <div v-if="post" class="quote-preview">
-            <p class="quote-preview-author">
-              {{ post.author.displayName || post.author.username }}
-            </p>
+            <p class="quote-preview-author">{{ post.author.displayName || post.author.username }}</p>
             <p class="quote-preview-content">{{ post.content }}</p>
           </div>
-          <!-- コメント入力 -->
           <textarea
             v-model="quoteContent"
             class="quote-textarea"
@@ -335,7 +497,6 @@ body {
 .status-text { text-align: center; color: #999; font-size: 14px; padding: 30px 0; }
 .status-text.error { color: #f66; }
 
-/* 投稿者情報 */
 .author-section { display: flex; align-items: center; gap: 12px; padding: 16px; cursor: pointer; }
 .author-section:hover { background-color: #f9f0ff; }
 .author-icon { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; display: block; flex-shrink: 0; }
@@ -344,11 +505,9 @@ body {
 .author-name { font-weight: bold; font-size: 16px; color: #333; }
 .author-username { font-size: 13px; color: #999; }
 
-/* 投稿本文 */
 .post-content { padding: 16px; }
 .post-text { font-size: 20px; line-height: 1.6; color: #333; margin: 0; white-space: pre-wrap; }
 
-/* 引用元の投稿 */
 .quoted-post { margin: 0 16px 16px; border: 1px solid #ddd; border-radius: 12px; padding: 12px; background-color: #fafafa; }
 .quoted-author { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .quoted-icon { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; display: block; flex-shrink: 0; }
@@ -357,41 +516,83 @@ body {
 .quoted-username { font-size: 12px; color: #999; }
 .quoted-content { margin: 0; font-size: 13px; color: #555; line-height: 1.5; }
 
-/* 投稿日時 */
 .post-meta { display: flex; align-items: center; gap: 12px; padding: 0 16px 16px; font-size: 13px; color: #999; }
 .edited-badge { font-size: 12px; color: #aaa; }
 .divider { border: 0; border-top: 1px solid #eee; margin: 0; }
 
-/* 統計情報 */
 .stats-row { display: flex; gap: 20px; padding: 14px 16px; flex-wrap: wrap; }
 .stat-item { display: flex; align-items: center; gap: 4px; }
 .stat-num { font-weight: bold; font-size: 16px; color: #333; }
-.stat-num.liked-color { color: #e0245e; }
+.stat-num.active-color { color: #6a21aa; }
 .stat-label { font-size: 13px; color: #999; }
 
-/* アクションボタン */
 .action-row { display: flex; gap: 8px; padding: 14px 16px; flex-wrap: wrap; }
 .action-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: none;
-  border: 1px solid #c65bed;
-  border-radius: 20px;
-  padding: 8px 16px;
-  font-size: 14px;
-  color: #c65bed;
-  cursor: pointer;
+  display: flex; align-items: center; gap: 6px;
+  background: none; border: 1px solid #c65bed;
+  border-radius: 20px; padding: 8px 16px;
+  font-size: 14px; color: #c65bed; cursor: pointer;
   transition: background-color 0.2s;
 }
 .action-btn:hover { background-color: #f5e6ff; }
-.action-btn.liked { background-color: #fce4f3; border-color: #e0245e; color: #e0245e; }
-.action-btn.quoted { background-color: #e6f9f0; border-color: #17bf63; color: #17bf63; }
+.action-btn.is-active { background-color: #f0e6ff; border-color: #6a21aa; color: #6a21aa; }
 .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .action-icon { width: 18px; height: 18px; object-fit: contain; }
-.disabled-btn { border-color: #ddd; color: #999; }
-.disabled-btn:hover { background-color: transparent; }
-.coming-soon { font-size: 11px; color: #bbb; }
+.icon-purple {
+  filter: brightness(0) saturate(100%) invert(27%) sepia(90%) saturate(500%) hue-rotate(250deg) brightness(0.8);
+}
+
+/* リプライ入力欄 */
+.reply-input-section { padding: 16px; }
+.reply-input-row { display: flex; gap: 12px; align-items: flex-start; }
+.reply-my-icon { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0; display: block; }
+.reply-my-icon--empty { background-color: #ddd; width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; }
+.reply-input-area { flex: 1; }
+.reply-textarea {
+  width: 100%; border: 1px solid #ddd; border-radius: 8px;
+  padding: 10px 12px; font-size: 14px; resize: none; outline: none;
+  box-sizing: border-box; font-family: inherit;
+}
+.reply-textarea:focus { border-color: #c65bed; }
+.reply-char-count { text-align: right; font-size: 11px; color: #999; margin-top: 4px; }
+.reply-char-count.error { color: red; }
+.reply-error { color: #f66; font-size: 13px; margin: 4px 0; }
+.reply-submit-row { display: flex; justify-content: flex-end; margin-top: 10px; }
+.reply-submit-btn {
+  background-color: #c65bed; color: white; border: none;
+  border-radius: 20px; padding: 8px 20px; font-size: 14px;
+  font-weight: bold; cursor: pointer;
+}
+.reply-submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* リプライ一覧（ツリー表示） */
+.replies-section { padding: 0 0 50px; }
+.reply-item {
+  display: flex;
+  padding: 12px 16px;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+}
+.reply-item:hover { background-color: #fdf8ff; }
+.reply-tree-line {
+  width: 2px;
+  background-color: #ddd;
+  margin: 0 16px 0 28px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.reply-content { flex: 1; }
+.reply-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.reply-icon-wrapper { cursor: pointer; flex-shrink: 0; }
+.reply-author-icon { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; display: block; }
+.reply-author-icon--empty { background-color: #ddd; width: 36px; height: 36px; border-radius: 50%; }
+.reply-author-info { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.reply-author-name { font-weight: bold; font-size: 13px; color: #333; }
+.reply-author-time { font-size: 12px; color: #999; }
+.reply-text { margin: 0 0 6px; font-size: 14px; color: #333; line-height: 1.5; }
+.reply-stats { display: flex; gap: 12px; }
+.reply-stat { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #999; }
+.reply-stat-icon { width: 14px; height: 14px; object-fit: contain; }
 
 /* 引用リツイートモーダル */
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 2000; display: flex; justify-content: center; align-items: center; }
