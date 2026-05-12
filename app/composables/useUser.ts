@@ -195,6 +195,19 @@ const requestFollow = async (targetUserId: string): Promise<FollowRequestRespons
   return response
 }
 
+// フォロー解除
+const unfollowUser = async (targetUserId: string): Promise<void> => {
+  const token = useCookie('accessToken').value
+  if (!token) throw new Error('ログインが必要です')
 
-  return { fetchUserProfile, updateProfile, fetchUserPosts, requestFollow }
+  await $fetch(
+    `${BASE_URL}/follows/${targetUserId}`,
+    {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    }
+  )
+}
+
+  return { fetchUserProfile, updateProfile, fetchUserPosts, requestFollow, unfollowUser }
 }

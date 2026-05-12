@@ -85,10 +85,21 @@ const switchTab = (tab: 'all' | 'unread') => {
 const handleApprove = async (notification: Notification) => {
   followActionStatus.value[notification.id] = 'approving'
   try {
+
+    // ↓↓↓ 一時的に追加 ↓↓↓
+    console.log('承認するactorId:', notification.actorId)
+    // ↑↑↑ ここまで ↑↑↑
+
     await approveFollow(notification.actorId)
     const target = notifications.value.find(n => n.id === notification.id)
     if (target) target.type = 'follow_approved'
   } catch (error: any) {
+
+    // ↓↓↓ 一時的に追加 ↓↓↓
+    console.log('エラー詳細:', error)
+    console.log('ステータス:', error.status)
+    // ↑↑↑ ここまで ↑↑↑
+
     alert('承認に失敗しました')
   } finally {
     followActionStatus.value[notification.id] = null

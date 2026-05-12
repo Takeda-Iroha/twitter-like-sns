@@ -5,23 +5,11 @@ import { useUser } from '~/composables/useUser'
 import type { UserProfile, UserPost } from '~/composables/useUser'
 
 const isMenuOpen = ref(false)
-const { fetchUserProfile, fetchUserPosts, requestFollow } = useUser()
+const { fetchUserProfile, fetchUserPosts, requestFollow, unfollowUser } = useUser()
 
-// ----------------------------------------
-// URLパラメータからusernameを取得
-// /users/johndoe にアクセスしたとき
-// route.params.username に「johndoe」が入る
-// ----------------------------------------
 const route = useRoute()
 const targetUsername = route.params.username as string
-
-// ----------------------------------------
-// ログイン中のユーザー名
-// 自分のページかどうかの判定に使う
-// ----------------------------------------
 const loggedInUsername = useCookie('username').value
-
-// 自分のページかどうかを判定
 const isMyPage = computed(() => targetUsername === loggedInUsername)
 
 const profile = ref<UserProfile | null>(null)
@@ -32,9 +20,16 @@ const userPosts = ref<UserPost[]>([])
 const isPostsLoading = ref(false)
 const postsError = ref('')
 
-// フォロー申請の状態管理
+// フォロー状態の管理
 const isFollowRequesting = ref(false)
 const followStatus = ref<'none' | 'pending' | 'following'>('none')
+
+// ----------------------------------------
+// フォロー解除モーダルの状態管理
+// ----------------------------------------
+const showUnfollowModal = ref(false)
+const isUnfollowing = ref(false)
+const unfollowError = ref('')
 
 const loadProfile = async () => {
   isLoading.value = true
@@ -43,11 +38,7 @@ const loadProfile = async () => {
   try {
     const data = await fetchUserProfile(targetUsername)
     profile.value = data
-
-    // フォロー状態を初期化
-    // isFollowing：フォロー済みかどうか
     followStatus.value = data.isFollowing ? 'following' : 'none'
-
     await loadUserPosts()
   } catch (error: any) {
     if (error.status === 401) {
@@ -69,17 +60,13 @@ const loadUserPosts = async () => {
 
   try {
     const result = await fetchUserPosts(targetUsername)
-
-    // フォロー状態によって表示する投稿を制御
     if (isMyPage.value) {
       userPosts.value = result.posts
     } else if (profile.value.isFollowing) {
-      // フォロワー：public + followers を表示
       userPosts.value = result.posts.filter(
         p => p.visibility === 'public' || p.visibility === 'followers'
       )
     } else {
-      // 非フォロワー：public のみ
       userPosts.value = result.posts.filter(p => p.visibility === 'public')
     }
   } catch (error: any) {
@@ -90,27 +77,66 @@ const loadUserPosts = async () => {
 }
 
 // ----------------------------------------
-// フォロー申請処理
-// profile.id（ユーザーID）を使って申請する
+// フォローボタンクリック処理
+// フォロー中のときはモーダルを開く
+// それ以外はフォロー申請する
 // ----------------------------------------
+const handleFollowButtonClick = () => {
+  if (followStatus.value === 'following') {
+    // フォロー中 → 解除モーダルを開く
+    unfollowError.value = ''
+    showUnfollowModal.value = true
+  } else if (followStatus.value === 'none') {
+    // 未フォロー → フォロー申請する
+    handleFollowRequest()
+  }
+  // pending（申請中）の場合は何もしない
+}
+
+// フォロー申請処理
 const handleFollowRequest = async () => {
   if (!profile.value) return
   isFollowRequesting.value = true
 
   try {
     const result = await requestFollow(profile.value.id)
-    // statusがpending → 申請中
-    // statusがapproved → フォロー済み
     followStatus.value = result.data.status === 'approved' ? 'following' : 'pending'
   } catch (error: any) {
     if (error.status === 409) {
-      // すでに申請済み
       followStatus.value = 'pending'
     } else {
       alert('フォロー申請に失敗しました')
     }
   } finally {
     isFollowRequesting.value = false
+  }
+}
+
+// ----------------------------------------
+// フォロー解除処理
+// モーダルの「フォロー解除する」ボタンから呼ばれる
+// ----------------------------------------
+const handleUnfollow = async () => {
+  if (!profile.value) return
+  isUnfollowing.value = true
+  unfollowError.value = ''
+
+  try {
+    await unfollowUser(profile.value.id)
+    followStatus.value = 'none'
+    showUnfollowModal.value = false
+
+    // フォロー解除後は投稿一覧を再取得する
+    // （フォロワー向け投稿が見えなくなるため）
+    await loadUserPosts()
+  } catch (error: any) {
+    if (error.status === 401) {
+      unfollowError.value = 'ログインが必要です'
+    } else {
+      unfollowError.value = 'フォロー解除に失敗しました'
+    }
+  } finally {
+    isUnfollowing.value = false
   }
 }
 
@@ -166,7 +192,6 @@ onMounted(() => {
             </div>
 
             <div class="profile-action">
-              <!-- 自分のページ → マイページへ誘導 -->
               <button
                 v-if="isMyPage"
                 class="edit-btn"
@@ -175,7 +200,6 @@ onMounted(() => {
                 プロフィールを編集
               </button>
 
-              <!-- 他人のページ → フォローボタン -->
               <button
                 v-else
                 class="follow-btn"
@@ -183,8 +207,8 @@ onMounted(() => {
                   'following': followStatus === 'following',
                   'pending': followStatus === 'pending'
                 }"
-                :disabled="isFollowRequesting || followStatus === 'following' || followStatus === 'pending'"
-                @click="handleFollowRequest"
+                :disabled="isFollowRequesting || followStatus === 'pending'"
+                @click="handleFollowButtonClick"
               >
                 {{ isFollowRequesting ? '送信中...' : followButtonLabel }}
               </button>
@@ -239,6 +263,37 @@ onMounted(() => {
         </main>
       </template>
     </div>
+
+    <!-- フォロー解除確認モーダル -->
+    <div
+      v-if="showUnfollowModal"
+      class="modal-overlay"
+      @click.self="showUnfollowModal = false"
+    >
+      <div class="modal">
+        <p class="modal-message">
+          <!-- profile.displayName または username を表示 -->
+          {{ profile?.displayName || profile?.username }} さんのフォローを解除しますか？
+        </p>
+        <p v-if="unfollowError" class="unfollow-error">{{ unfollowError }}</p>
+        <div class="modal-buttons">
+          <button
+            class="modal-cancel-btn"
+            @click="showUnfollowModal = false"
+          >
+            キャンセル
+          </button>
+          <button
+            class="modal-unfollow-btn"
+            :disabled="isUnfollowing"
+            @click="handleUnfollow"
+          >
+            {{ isUnfollowing ? '解除中...' : 'フォロー解除する' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -265,8 +320,10 @@ body {
 .edit-btn:hover { background-color: #f5e6ff; }
 
 /* フォローボタン */
-.follow-btn { background-color: #c65bed; border: none; border-radius: 20px; padding: 6px 16px; font-size: 13px; color: white; cursor: pointer; font-weight: bold; }
-.follow-btn.following { background-color: #fff; border: 1px solid #ccc; color: #666; cursor: default; }
+.follow-btn { background-color: #c65bed; border: none; border-radius: 20px; padding: 6px 16px; font-size: 13px; color: white; cursor: pointer; font-weight: bold; transition: background-color 0.2s; }
+.follow-btn:hover { background-color: #a84fd4; }
+.follow-btn.following { background-color: #fff; border: 1px solid #ccc; color: #666; }
+.follow-btn.following:hover { background-color: #fff0f0; border-color: #f66; color: #f66; }
 .follow-btn.pending { background-color: #f0f0f0; border: 1px solid #ccc; color: #999; cursor: default; }
 .follow-btn:disabled { opacity: 0.8; }
 
@@ -296,4 +353,62 @@ body {
 .like-area { display: flex; align-items: center; color: #333; gap: 4px; }
 .like-num { font-size: 13px; }
 .heart-icon { width: 18px; height: 18px; object-fit: contain; }
+
+/* フォロー解除モーダル */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background-color: rgba(0,0,0,0.5);
+  z-index: 2000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.modal {
+  background: white;
+  border-radius: 16px;
+  padding: 30px 24px 20px;
+  width: 80%;
+  max-width: 320px;
+  text-align: center;
+}
+.modal-message {
+  font-size: 16px;
+  font-weight: bold;
+  margin: 0 0 20px;
+  color: #333;
+  line-height: 1.5;
+}
+.unfollow-error {
+  color: #f66;
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+.modal-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.modal-cancel-btn {
+  flex: 1;
+  background: none;
+  border: 1px solid #ddd;
+  border-radius: 20px;
+  padding: 10px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.modal-unfollow-btn {
+  flex: 1;
+  background-color: #f66;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+}
+.modal-unfollow-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 </style>
