@@ -85,6 +85,7 @@ const goToPostForm = () => { navigateTo('/postForm') }
           v-for="post in posts"
           :key="post.id"
           :post="post"
+          @deleted="(postId) => posts = posts.filter(p => p.id !== postId)"
         />
         <p v-if="posts.length === 0" class="status-text">投稿がありません</p>
       </template>

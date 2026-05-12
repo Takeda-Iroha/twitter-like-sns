@@ -205,6 +205,7 @@ onMounted(() => {
             v-for="post in userPosts"
             :key="post.id"
             :post="(post as any)"
+            @deleted="(postId) => userPosts = userPosts.filter(p => p.id !== postId)"
           />
         </main>
       </template>
