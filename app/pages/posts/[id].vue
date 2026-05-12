@@ -519,13 +519,13 @@ onMounted(async () => {
             <label class="visibility-label">公開範囲</label>
             <div class="visibility-options">
               <label class="visibility-option">
-                <input type="radio" v-model="editVisibility" value="public" />🌍 全員
+                <input type="radio" v-model="editVisibility" value="public" />全員
               </label>
               <label class="visibility-option">
-                <input type="radio" v-model="editVisibility" value="followers" />👥 フォロワーのみ
+                <input type="radio" v-model="editVisibility" value="followers" />フォロワーのみ
               </label>
               <label class="visibility-option">
-                <input type="radio" v-model="editVisibility" value="private" />🔒 自分のみ
+                <input type="radio" v-model="editVisibility" value="private" />自分のみ
               </label>
             </div>
           </div>

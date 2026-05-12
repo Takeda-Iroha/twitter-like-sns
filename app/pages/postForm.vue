@@ -30,9 +30,9 @@ const loadMyProfile = async () => {
 }
 
 const visibilityLabel = computed(() => {
-  if (visibility.value === 'public') return '🌍 全員'
-  if (visibility.value === 'followers') return '👥 フォロワーのみ'
-  return '🔒 自分のみ'
+  if (visibility.value === 'public') return '全員'
+  if (visibility.value === 'followers') return 'フォロワーのみ'
+  return '自分のみ'
 })
 
 const handleImageSelect = (event: Event) => {
@@ -152,17 +152,17 @@ onMounted(() => {
               class="visibility-option"
               :class="{ 'active': visibility === 'public' }"
               @click="visibility = 'public'; showVisibilityMenu = false"
-            >🌍 全員</div>
+            >全員</div>
             <div
               class="visibility-option"
               :class="{ 'active': visibility === 'followers' }"
               @click="visibility = 'followers'; showVisibilityMenu = false"
-            >👥 フォロワーのみ</div>
+            >フォロワーのみ</div>
             <div
               class="visibility-option"
               :class="{ 'active': visibility === 'private' }"
               @click="visibility = 'private'; showVisibilityMenu = false"
-            >🔒 自分のみ</div>
+            >自分のみ</div>
           </div>
         </div>
       </div>
