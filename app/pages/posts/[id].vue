@@ -16,22 +16,18 @@ const post = ref<Post | null>(null)
 const isLoading = ref(false)
 const errorMessage = ref('')
 
-// いいね状態のローカル管理
 const isLiked = ref(false)
 const likeCount = ref(0)
 const isLiking = ref(false)
 
-// 引用リツイート状態のローカル管理
 const isQuoted = ref(false)
 const quoteCount = ref(0)
 const isQuoting = ref(false)
 
-// 引用リツイートモーダルの状態管理
 const showQuoteModal = ref(false)
 const quoteContent = ref('')
 const quoteError = ref('')
 
-// リプライ関連の状態管理
 const replies = ref<Reply[]>([])
 const isRepliesLoading = ref(false)
 const repliesError = ref('')
@@ -40,7 +36,6 @@ const isReplying = ref(false)
 const replyError = ref('')
 const replyCount = ref(0)
 
-// 自分のアイコン（リプライ入力欄用）
 const myProfileImageUrl = ref('')
 const loggedInUsername = useCookie('username').value
 
@@ -68,7 +63,6 @@ const loadPost = async () => {
   }
 }
 
-// リプライ一覧取得
 const loadReplies = async () => {
   isRepliesLoading.value = true
   repliesError.value = ''
@@ -81,7 +75,6 @@ const loadReplies = async () => {
   }
 }
 
-// 自分のアイコン取得
 const loadMyProfile = async () => {
   if (!loggedInUsername) return
   try {
@@ -90,7 +83,6 @@ const loadMyProfile = async () => {
   } catch { /* 失敗しても問題なし */ }
 }
 
-// いいね処理
 const handleLike = async () => {
   if (isLiking.value) return
   isLiking.value = true
@@ -111,14 +103,12 @@ const handleLike = async () => {
   }
 }
 
-// 引用リツイートモーダルを開く
 const openQuoteModal = () => {
   quoteContent.value = ''
   quoteError.value = ''
   showQuoteModal.value = true
 }
 
-// 引用リツイート送信
 const handleQuote = async () => {
   if (!quoteContent.value.trim()) return
   isQuoting.value = true
@@ -141,7 +131,6 @@ const handleQuote = async () => {
   }
 }
 
-// 引用リツイート取り消し
 const handleDeleteQuote = async () => {
   isQuoting.value = true
   try {
@@ -155,8 +144,6 @@ const handleDeleteQuote = async () => {
   }
 }
 
-// リプライ送信処理
-// createPost に replyToId を渡すだけでリプライになる
 const handleReply = async () => {
   if (!replyContent.value.trim()) return
   isReplying.value = true
@@ -169,7 +156,6 @@ const handleReply = async () => {
     })
     replyContent.value = ''
     replyCount.value += 1
-    // 送信後にリプライ一覧を再取得
     await loadReplies()
   } catch (error: any) {
     if (error.status === 401) {
@@ -249,8 +235,12 @@ onMounted(async () => {
           <p class="post-text">{{ post.content }}</p>
         </div>
 
-        <!-- 引用元の投稿 -->
-        <div v-if="post.quotedMessage" class="quoted-post">
+        <!-- 引用元の投稿（引用リツイートの場合のみ） -->
+        <div
+          v-if="post.quotedMessage"
+          class="quoted-post"
+          @click="navigateTo(`/posts/${post.quotedMessage.id}`)"
+        >
           <div class="quoted-author">
             <img
               v-if="post.quotedMessage.author.profileImageUrl"
@@ -267,31 +257,51 @@ onMounted(async () => {
           <p class="quoted-content">{{ post.quotedMessage.content }}</p>
         </div>
 
-        <!-- 投稿日時・編集済みフラグ -->
+        <!-- 投稿日時・編集済みフラグ（右寄せ） -->
         <div class="post-meta">
-          <span class="post-date">{{ formatDate(post.createdAt) }} に投稿</span>
           <span v-if="post.isEdited" class="edited-badge">✏️ 編集済み</span>
+          <span class="post-date">{{ formatDate(post.createdAt) }} に投稿</span>
         </div>
 
         <hr class="divider" />
 
-        <!-- 統計情報 -->
+        <!-- 統計情報（中央寄せ・投稿カードと同じデザイン） -->
         <div class="stats-row">
           <div class="stat-item">
-            <span class="stat-num">{{ replyCount }}</span>
-            <span class="stat-label">リプライ</span>
+            <img src="/images/icon_reply.svg" class="stat-icon" alt="リプライ" />
+            <span class="stat-num">{{ replyCount > 0 ? replyCount : '' }}</span>
           </div>
           <div class="stat-item">
-            <span class="stat-num">{{ quoteCount }}</span>
-            <span class="stat-label">引用</span>
+            <img
+              src="/images/icon_retweet.svg"
+              class="stat-icon"
+              :class="{ 'icon-purple': isQuoted }"
+              alt="引用"
+            />
+            <span class="stat-num" :class="{ 'count-purple': isQuoted }">
+              {{ quoteCount > 0 ? quoteCount : '' }}
+            </span>
           </div>
           <div class="stat-item">
-            <span class="stat-num" :class="{ 'active-color': isLiked }">{{ likeCount }}</span>
-            <span class="stat-label">いいね</span>
+            <img
+              v-if="isLiked"
+              src="/images/icon_heart_fill.svg"
+              class="stat-icon icon-purple"
+              alt="いいね"
+            />
+            <img
+              v-else
+              src="/images/icon_heart.svg"
+              class="stat-icon"
+              alt="いいね"
+            />
+            <span class="stat-num" :class="{ 'count-purple': isLiked }">
+              {{ likeCount > 0 ? likeCount : '' }}
+            </span>
           </div>
           <div class="stat-item">
-            <span class="stat-num">{{ post.viewCount }}</span>
-            <span class="stat-label">閲覧</span>
+            <img src="/images/icon_views.svg" class="stat-icon" alt="閲覧" />
+            <span class="stat-num">{{ post.viewCount > 0 ? post.viewCount : '' }}</span>
           </div>
         </div>
 
@@ -299,8 +309,6 @@ onMounted(async () => {
 
         <!-- アクションボタン行 -->
         <div class="action-row">
-
-          <!-- 引用リツイートボタン -->
           <button
             class="action-btn"
             :class="{ 'is-active': isQuoted }"
@@ -316,7 +324,6 @@ onMounted(async () => {
             <span>{{ isQuoted ? '引用済み' : '引用' }}</span>
           </button>
 
-          <!-- いいねボタン -->
           <button
             class="action-btn"
             :class="{ 'is-active': isLiked }"
@@ -337,7 +344,6 @@ onMounted(async () => {
             />
             <span>{{ isLiked ? 'いいね済み' : 'いいね' }}</span>
           </button>
-
         </div>
 
         <hr class="divider" />
@@ -379,7 +385,7 @@ onMounted(async () => {
 
         <hr class="divider" />
 
-        <!-- リプライ一覧（ツリー表示） -->
+        <!-- リプライ一覧 -->
         <div class="replies-section">
           <p v-if="isRepliesLoading" class="status-text">読み込み中...</p>
           <p v-else-if="repliesError" class="status-text error">{{ repliesError }}</p>
@@ -390,16 +396,13 @@ onMounted(async () => {
             v-for="reply in replies"
             :key="reply.id"
             class="reply-item"
-            @click="navigateTo(`/posts/${reply.id}`)"
           >
-            <!-- ツリーライン -->
-            <div class="reply-tree-line" />
-
             <div class="reply-content">
+              <!-- リプライ投稿者情報 -->
               <div class="reply-header">
                 <div
                   class="reply-icon-wrapper"
-                  @click.stop="navigateTo(`/users/${reply.author.username}`)"
+                  @click="navigateTo(`/users/${reply.author.username}`)"
                 >
                   <img
                     v-if="reply.author.profileImageUrl"
@@ -419,13 +422,75 @@ onMounted(async () => {
                 </div>
               </div>
 
-              <p class="reply-text">{{ reply.content }}</p>
+              <!-- リプライ本文 -->
+              <p class="reply-text" @click="navigateTo(`/posts/${reply.id}`)">
+                {{ reply.content }}
+              </p>
 
-              <div class="reply-stats">
-                <span class="reply-stat">
-                  <img src="/images/icon_heart.svg" class="reply-stat-icon" alt="" />
-                  {{ reply.likeCount > 0 ? reply.likeCount : '' }}
-                </span>
+              <!-- リプライのリアクション一覧（投稿カードと同じデザイン） -->
+              <div class="reply-actions-row">
+                <!-- リプライへのリプライ → 詳細ページへ -->
+                <div class="reply-action-item">
+                  <button
+                    class="reply-action-btn"
+                    @click="navigateTo(`/posts/${reply.id}`)"
+                  >
+                    <img src="/images/icon_reply.svg" class="reply-action-icon" alt="リプライ" />
+                  </button>
+                  <span class="reply-action-count">
+                    {{ reply.replyCount > 0 ? reply.replyCount : '' }}
+                  </span>
+                </div>
+
+                <!-- リツイート数 -->
+                <div class="reply-action-item">
+                  <button
+                    class="reply-action-btn"
+                    @click="navigateTo(`/posts/${reply.id}`)"
+                  >
+                    <img
+                      src="/images/icon_retweet.svg"
+                      class="reply-action-icon"
+                      :class="{ 'icon-purple': reply.isQuoted }"
+                      alt="引用"
+                    />
+                  </button>
+                  <span class="reply-action-count" :class="{ 'count-purple': reply.isQuoted }">
+                    {{ reply.quoteCount > 0 ? reply.quoteCount : '' }}
+                  </span>
+                </div>
+
+                <!-- いいね数 -->
+                <div class="reply-action-item">
+                  <button
+                    class="reply-action-btn"
+                    @click="navigateTo(`/posts/${reply.id}`)"
+                  >
+                    <img
+                      v-if="reply.isLiked"
+                      src="/images/icon_heart_fill.svg"
+                      class="reply-action-icon icon-purple"
+                      alt="いいね済み"
+                    />
+                    <img
+                      v-else
+                      src="/images/icon_heart.svg"
+                      class="reply-action-icon"
+                      alt="いいね"
+                    />
+                  </button>
+                  <span class="reply-action-count" :class="{ 'count-purple': reply.isLiked }">
+                    {{ reply.likeCount > 0 ? reply.likeCount : '' }}
+                  </span>
+                </div>
+
+                <!-- 閲覧数 -->
+                <div class="reply-action-item">
+                  <img src="/images/icon_views.svg" class="reply-action-icon" alt="閲覧数" />
+                  <span class="reply-action-count">
+                    {{ reply.viewCount > 0 ? reply.viewCount : '' }}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -443,7 +508,19 @@ onMounted(async () => {
         </div>
         <div class="modal-body">
           <div v-if="post" class="quote-preview">
-            <p class="quote-preview-author">{{ post.author.displayName || post.author.username }}</p>
+            <div class="quote-preview-author-row">
+              <img
+                v-if="post.author.profileImageUrl"
+                :src="post.author.profileImageUrl"
+                class="quote-preview-icon"
+                alt=""
+              />
+              <div v-else class="quote-preview-icon quote-preview-icon--empty" />
+              <span class="quote-preview-name">
+                {{ post.author.displayName || post.author.username }}
+              </span>
+              <span class="quote-preview-username">@{{ post.author.username }}</span>
+            </div>
             <p class="quote-preview-content">{{ post.content }}</p>
           </div>
           <textarea
@@ -508,23 +585,48 @@ body {
 .post-content { padding: 16px; }
 .post-text { font-size: 20px; line-height: 1.6; color: #333; margin: 0; white-space: pre-wrap; }
 
-.quoted-post { margin: 0 16px 16px; border: 1px solid #ddd; border-radius: 12px; padding: 12px; background-color: #fafafa; }
-.quoted-author { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.quoted-icon { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; display: block; flex-shrink: 0; }
-.quoted-icon--empty { background-color: #ccc; }
-.quoted-name { font-weight: bold; font-size: 13px; color: #333; }
-.quoted-username { font-size: 12px; color: #999; }
-.quoted-content { margin: 0; font-size: 13px; color: #555; line-height: 1.5; }
+/* 引用元の投稿 */
+.quoted-post {
+  margin: 0 16px 16px; border: 1px solid #e0e0e0;
+  border-radius: 12px; padding: 12px; background-color: #f8f8f8; cursor: pointer;
+}
+.quoted-post:hover { background-color: #f0e6ff; }
+.quoted-author { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.quoted-icon { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; display: block; flex-shrink: 0; }
+.quoted-icon--empty { background-color: #ccc; width: 20px; height: 20px; border-radius: 50%; }
+.quoted-name { font-weight: bold; font-size: 12px; color: #555; }
+.quoted-username { font-size: 11px; color: #aaa; }
+.quoted-content { margin: 0; font-size: 13px; color: #777; line-height: 1.5; }
 
-.post-meta { display: flex; align-items: center; gap: 12px; padding: 0 16px 16px; font-size: 13px; color: #999; }
+/* 投稿日時（右寄せ） */
+.post-meta {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px 16px;
+  font-size: 13px;
+  color: #999;
+}
 .edited-badge { font-size: 12px; color: #aaa; }
 .divider { border: 0; border-top: 1px solid #eee; margin: 0; }
 
-.stats-row { display: flex; gap: 20px; padding: 14px 16px; flex-wrap: wrap; }
+/* 統計情報（中央寄せ・投稿カードと同じデザイン） */
+.stats-row {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  padding: 14px 16px;
+}
 .stat-item { display: flex; align-items: center; gap: 4px; }
-.stat-num { font-weight: bold; font-size: 16px; color: #333; }
-.stat-num.active-color { color: #6a21aa; }
-.stat-label { font-size: 13px; color: #999; }
+.stat-icon { width: 20px; height: 20px; object-fit: contain; }
+.stat-num { font-size: 14px; color: #666; min-width: 16px; }
+.stat-num.count-purple { color: #6a21aa; }
+
+.icon-purple {
+  filter: brightness(0) saturate(100%) invert(27%) sepia(90%) saturate(500%) hue-rotate(250deg) brightness(0.8);
+}
+.count-purple { color: #6a21aa; }
 
 .action-row { display: flex; gap: 8px; padding: 14px 16px; flex-wrap: wrap; }
 .action-btn {
@@ -538,9 +640,6 @@ body {
 .action-btn.is-active { background-color: #f0e6ff; border-color: #6a21aa; color: #6a21aa; }
 .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .action-icon { width: 18px; height: 18px; object-fit: contain; }
-.icon-purple {
-  filter: brightness(0) saturate(100%) invert(27%) sepia(90%) saturate(500%) hue-rotate(250deg) brightness(0.8);
-}
 
 /* リプライ入力欄 */
 .reply-input-section { padding: 16px; }
@@ -565,22 +664,13 @@ body {
 }
 .reply-submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
-/* リプライ一覧（ツリー表示） */
+/* リプライ一覧 */
 .replies-section { padding: 0 0 50px; }
 .reply-item {
-  display: flex;
   padding: 12px 16px;
   border-bottom: 1px solid #eee;
-  cursor: pointer;
 }
 .reply-item:hover { background-color: #fdf8ff; }
-.reply-tree-line {
-  width: 2px;
-  background-color: #ddd;
-  margin: 0 16px 0 28px;
-  border-radius: 2px;
-  flex-shrink: 0;
-}
 .reply-content { flex: 1; }
 .reply-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .reply-icon-wrapper { cursor: pointer; flex-shrink: 0; }
@@ -589,22 +679,41 @@ body {
 .reply-author-info { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .reply-author-name { font-weight: bold; font-size: 13px; color: #333; }
 .reply-author-time { font-size: 12px; color: #999; }
-.reply-text { margin: 0 0 6px; font-size: 14px; color: #333; line-height: 1.5; }
-.reply-stats { display: flex; gap: 12px; }
-.reply-stat { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #999; }
-.reply-stat-icon { width: 14px; height: 14px; object-fit: contain; }
+.reply-text { margin: 0 0 8px; font-size: 14px; color: #333; line-height: 1.5; cursor: pointer; }
+.reply-text:hover { color: #6a21aa; }
 
-/* 引用リツイートモーダル */
+/* リプライのリアクション一覧 */
+.reply-actions-row {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  align-items: center;
+}
+.reply-action-item { display: flex; align-items: center; gap: 4px; }
+.reply-action-btn {
+  background: none; border: none; padding: 4px;
+  cursor: pointer; display: flex; align-items: center;
+  border-radius: 50%;
+}
+.reply-action-btn:hover { background-color: #f0e6fa; }
+.reply-action-icon { width: 16px; height: 16px; object-fit: contain; }
+.reply-action-count { font-size: 12px; color: #666; min-width: 14px; }
+
+/* モーダル */
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 2000; display: flex; justify-content: center; align-items: center; }
 .modal { background: white; border-radius: 16px; width: 90%; max-width: 480px; max-height: 90vh; overflow-y: auto; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #eee; }
 .modal-title { margin: 0; font-size: 16px; font-weight: bold; }
 .modal-close-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: #999; }
 .modal-body { padding: 20px; }
-.quote-preview { border: 1px solid #ddd; border-radius: 10px; padding: 12px; margin-bottom: 16px; background-color: #fafafa; }
-.quote-preview-author { margin: 0 0 4px; font-size: 13px; font-weight: bold; color: #333; }
+.quote-preview { border: 1px solid #e0e0e0; border-radius: 10px; padding: 12px; margin-bottom: 16px; background-color: #f8f8f8; }
+.quote-preview-author-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.quote-preview-icon { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; display: block; flex-shrink: 0; }
+.quote-preview-icon--empty { background-color: #ccc; width: 24px; height: 24px; border-radius: 50%; }
+.quote-preview-name { font-weight: bold; font-size: 13px; color: #333; }
+.quote-preview-username { font-size: 12px; color: #999; }
 .quote-preview-content { margin: 0; font-size: 13px; color: #555; line-height: 1.5; }
-.quote-textarea { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; box-sizing: border-box; outline: none; resize: none; min-height: 100px; }
+.quote-textarea { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; box-sizing: border-box; outline: none; resize: none; min-height: 100px; font-family: inherit; }
 .quote-textarea:focus { border-color: #c65bed; }
 .char-count { text-align: right; font-size: 12px; color: #666; margin-top: 4px; }
 .char-count.error { color: red; font-weight: bold; }
