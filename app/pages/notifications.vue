@@ -4,13 +4,14 @@ import { useNotification } from '~/composables/useNotification'
 import type { Notification } from '~/composables/useNotification'
 
 const isMenuOpen = ref(false)
-const { fetchNotifications, markAllAsRead, approveFollow, rejectFollow } = useNotification()
+const { fetchNotifications, markAllAsRead, approveFollow, rejectFollow, fetchPendingFollows } = useNotification()
 
 const notifications = ref<Notification[]>([])
 const isLoading = ref(false)
 const errorMessage = ref('')
 const newNotificationIds = ref<number[]>([])
 const followActionStatus = ref<Record<number, string | null>>({})
+const pendingFollowerIds = ref<string[]>([])
 
 // タブ管理
 const activeTab = ref<'all' | 'unread'>('all')
@@ -46,23 +47,22 @@ const formatDate = (dateStr: string): string => {
 const loadNotifications = async (unreadOnly = false) => {
   isLoading.value = true
   errorMessage.value = ''
-
   try {
-    const response = await fetchNotifications(undefined, 20, unreadOnly)
+    // 通知一覧と承認待ち一覧を並列で取得
+    const [response, pendingIds] = await Promise.all([
+      fetchNotifications(undefined, 20, unreadOnly),
+      fetchPendingFollows()
+    ])
 
-    // actorがない通知もそのまま表示する
-    // （actorがない場合はグレーの丸・「誰か」と表示）
     notifications.value = response.data
+    pendingFollowerIds.value = pendingIds
 
-    // 初回取得時のみ新規通知IDを記録して全既読にする
     if (newNotificationIds.value.length === 0) {
       newNotificationIds.value = response.data
         .filter(n => !n.isRead)
         .map(n => n.id)
-
       await markAllAsRead()
     }
-
   } catch (error: any) {
     if (error.status === 401) {
       navigateTo('/login')
@@ -85,8 +85,7 @@ const handleApprove = async (notification: Notification) => {
   followActionStatus.value[notification.id] = 'approving'
   try {
     await approveFollow(notification.actorId)
-    const target = notifications.value.find(n => n.id === notification.id)
-    if (target) target.type = 'follow_approved'
+    pendingFollowerIds.value = pendingFollowerIds.value.filter(id => id !== notification.actorId)
   } catch (error: any) {
     alert('承認に失敗しました')
   } finally {
@@ -99,6 +98,7 @@ const handleReject = async (notification: Notification) => {
   try {
     await rejectFollow(notification.actorId)
     notifications.value = notifications.value.filter(n => n.id !== notification.id)
+    pendingFollowerIds.value = pendingFollowerIds.value.filter(id => id !== notification.actorId)
   } catch (error: any) {
     alert('拒否に失敗しました')
   } finally {
@@ -173,9 +173,9 @@ onMounted(() => {
             <p class="notification-date">{{ formatDate(notification.createdAt) }}</p>
 
             <div
-              v-if="notification.type === 'follow_request'"
-              class="follow-actions"
-            >
+                v-if="notification.type === 'follow_request' && pendingFollowerIds.includes(notification.actorId)"
+                class="follow-actions"
+              >
               <button
                 class="approve-btn"
                 :disabled="!!followActionStatus[notification.id]"
@@ -192,8 +192,11 @@ onMounted(() => {
               </button>
             </div>
 
-            <p v-if="notification.type === 'follow_approved'" class="approved-label">
-              ✅ 承認済み
+            <p
+              v-if="notification.type === 'follow_approved' || (notification.type === 'follow_request' && !pendingFollowerIds.includes(notification.actorId))"
+              class="approved-label"
+            >
+              承認済み
             </p>
           </div>
         </article>

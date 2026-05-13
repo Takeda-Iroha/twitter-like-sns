@@ -183,10 +183,27 @@ export const useNotification = () => {
     return response
   }
 
+  // 承認待ちフォローリクエスト一覧取得
+const fetchPendingFollows = async (): Promise<string[]> => {
+  const token = useCookie('accessToken').value
+  if (!token) throw new Error('ログインが必要です')
+
+  const response = await $fetch<{
+    data: Array<{ follower: { id: string } }>
+  }>(`${BASE_URL}/follows/pending`, {
+    method: 'GET',
+    headers: { 'Authorization': `Bearer ${token}` }
+  })
+
+  // 承認待ちユーザーのIDだけ配列で返す
+  return response.data.map(item => item.follower.id)
+}
+
   return {
     fetchNotifications,
     fetchUnreadCount,
     markAllAsRead,
+    fetchPendingFollows,
     approveFollow,
     rejectFollow
   }
