@@ -36,16 +36,10 @@ const isMyPost = computed(() => props.post.author.username === loggedInUsername)
 const isMyQuotePost = computed(() => isMyPost.value && props.post.quotedMessage != null)
 const myProfileImageUrl = ref('')
 
-// ----------------------------------------
-// 投稿本文のローカル管理（編集後に反映するため）
-// ----------------------------------------
 const currentContent = ref(props.post.content)
 const currentVisibility = ref(props.post.visibility)
 const currentIsEdited = ref(props.post.isEdited)
 
-// ----------------------------------------
-// 編集モーダルの状態管理
-// ----------------------------------------
 const showEditModal = ref(false)
 const editContent = ref('')
 const editVisibility = ref<'public' | 'followers' | 'private'>('public')
@@ -157,10 +151,6 @@ const handleDeleteQuotePost = async (event: Event) => {
   }
 }
 
-// ----------------------------------------
-// 編集モーダルを開く
-// 現在の投稿内容をモーダルに表示する
-// ----------------------------------------
 const openEditModal = (event: Event) => {
   event.stopPropagation()
   showMenu.value = false
@@ -170,9 +160,6 @@ const openEditModal = (event: Event) => {
   showEditModal.value = true
 }
 
-// ----------------------------------------
-// 投稿編集処理
-// ----------------------------------------
 const handleUpdate = async (event: Event) => {
   event.stopPropagation()
   if (!editContent.value.trim()) return
@@ -180,7 +167,6 @@ const handleUpdate = async (event: Event) => {
   editError.value = ''
   try {
     await updatePost(props.post.id, editContent.value, editVisibility.value)
-    // 編集後はローカルの内容を更新して画面に反映
     currentContent.value = editContent.value
     currentVisibility.value = editVisibility.value
     currentIsEdited.value = true
@@ -200,10 +186,6 @@ const handleUpdate = async (event: Event) => {
   }
 }
 
-// ----------------------------------------
-// 投稿削除処理
-// 削除後は emit で親に通知
-// ----------------------------------------
 const handleDelete = async (event: Event) => {
   event.stopPropagation()
   showMenu.value = false
@@ -291,32 +273,24 @@ onMounted(() => {
         <div v-if="isMyPost" class="post-menu-btn" @click.stop>
           <button class="menu-dots-btn" @click="showMenu = !showMenu">•••</button>
           <div v-if="showMenu" class="menu-dropdown">
-            <!-- 引用リツイートの場合は削除のみ -->
             <template v-if="isMyQuotePost">
               <div class="menu-item delete-item" @click="handleDeleteQuotePost">
                 🗑 引用リツイートを削除
               </div>
             </template>
-            <!-- 通常の投稿の場合は編集・削除 -->
             <template v-else>
-              <div class="menu-item" @click="openEditModal">
-                投稿を編集
-              </div>
-              <div class="menu-item delete-item" @click="handleDelete">
-                投稿を削除
-              </div>
+              <div class="menu-item" @click="openEditModal">投稿を編集</div>
+              <div class="menu-item delete-item" @click="handleDelete">投稿を削除</div>
             </template>
           </div>
         </div>
 
+        <!-- UserAvatarコンポーネントに置き換え -->
         <div class="icon-wrapper" @click="goToProfile">
-          <img
-            v-if="post.author.profileImageUrl"
-            :src="post.author.profileImageUrl"
-            class="post-user-icon"
-            alt="ユーザーアイコン"
+          <UserAvatar
+            :profile-image-url="post.author.profileImageUrl"
+            :size="40"
           />
-          <div v-else class="post-user-icon post-user-icon--empty" />
         </div>
 
         <div class="post-user-info">
@@ -328,7 +302,6 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- 投稿本文（編集後はcurrentContentを表示） -->
       <div class="post-body">
         <p>{{ currentContent }}</p>
       </div>
@@ -339,13 +312,11 @@ onMounted(() => {
         @click.stop="navigateTo(`/posts/${post.quotedMessage.id}`)"
       >
         <div class="quoted-author">
-          <img
-            v-if="post.quotedMessage.author.profileImageUrl"
-            :src="post.quotedMessage.author.profileImageUrl"
-            class="quoted-icon"
-            alt=""
+          <!-- 引用元のアイコンもUserAvatarに -->
+          <UserAvatar
+            :profile-image-url="post.quotedMessage.author.profileImageUrl"
+            :size="20"
           />
-          <div v-else class="quoted-icon quoted-icon--empty" />
           <span class="quoted-name">{{ post.quotedMessage.author.displayName || post.quotedMessage.author.username }}</span>
           <span class="quoted-username">@{{ post.quotedMessage.author.username }}</span>
         </div>
@@ -354,47 +325,36 @@ onMounted(() => {
 
       <div class="post-footer" @click.stop>
         <div class="action-area">
-
           <div class="action-item">
             <button class="action-button" :class="{ 'is-active': showReplyForm }" @click="handleReplyClick">
               <img src="/images/icon_reply.svg" class="action-icon" :class="{ 'icon-purple': showReplyForm }" alt="リプライ" />
             </button>
-            <span class="action-count" :class="{ 'count-purple': showReplyForm }">
-              {{ replyCount > 0 ? replyCount : '' }}
-            </span>
+            <span class="action-count" :class="{ 'count-purple': showReplyForm }">{{ replyCount > 0 ? replyCount : '' }}</span>
           </div>
-
           <div class="action-item">
             <button class="action-button" :disabled="isQuoting" @click="handleQuoteClick">
               <img src="/images/icon_retweet.svg" class="action-icon" :class="{ 'icon-purple': isQuoted }" alt="引用リツイート" />
             </button>
-            <span class="action-count" :class="{ 'count-purple': isQuoted }">
-              {{ quoteCount > 0 ? quoteCount : '' }}
-            </span>
+            <span class="action-count" :class="{ 'count-purple': isQuoted }">{{ quoteCount > 0 ? quoteCount : '' }}</span>
           </div>
-
           <div class="action-item">
             <button class="action-button" :disabled="isLiking" @click="handleLikeClick">
               <img v-if="isLiked" src="/images/icon_heart_fill.svg" class="action-icon icon-purple" alt="いいね済み" />
               <img v-else src="/images/icon_heart.svg" class="action-icon" alt="いいね" />
             </button>
-            <span class="action-count" :class="{ 'count-purple': isLiked }">
-              {{ likeCount > 0 ? likeCount : '' }}
-            </span>
+            <span class="action-count" :class="{ 'count-purple': isLiked }">{{ likeCount > 0 ? likeCount : '' }}</span>
           </div>
-
           <div class="action-item views-item">
             <img src="/images/icon_views.svg" class="action-icon" alt="閲覧数" />
             <span class="action-count">{{ post.viewCount > 0 ? post.viewCount : '' }}</span>
           </div>
-
         </div>
       </div>
 
       <div v-if="showReplyForm" class="reply-form" @click.stop>
         <div class="reply-form-inner">
-          <img v-if="myProfileImageUrl" :src="myProfileImageUrl" class="reply-user-icon" alt="自分のアイコン" />
-          <div v-else class="reply-user-icon reply-user-icon--empty" />
+          <!-- 自分のアイコンもUserAvatarに -->
+          <UserAvatar :profile-image-url="myProfileImageUrl" :size="36" />
           <div class="reply-input-area">
             <textarea
               v-model="replyContent"
@@ -435,8 +395,7 @@ onMounted(() => {
       <div class="modal-body">
         <div class="quote-preview">
           <div class="quote-preview-author-row">
-            <img v-if="post.author.profileImageUrl" :src="post.author.profileImageUrl" class="quote-preview-icon" alt="" />
-            <div v-else class="quote-preview-icon quote-preview-icon--empty" />
+            <UserAvatar :profile-image-url="post.author.profileImageUrl" :size="24" />
             <span class="quote-preview-name">{{ post.author.displayName || post.author.username }}</span>
             <span class="quote-preview-username">@{{ post.author.username }}</span>
           </div>
@@ -448,11 +407,7 @@ onMounted(() => {
       </div>
       <div class="modal-footer">
         <button class="cancel-btn" @click="showQuoteModal = false">キャンセル</button>
-        <button
-          class="submit-btn"
-          @click="handleQuoteSubmit"
-          :disabled="!quoteContent.trim() || quoteContent.length > 250 || isQuoting"
-        >
+        <button class="submit-btn" @click="handleQuoteSubmit" :disabled="!quoteContent.trim() || quoteContent.length > 250 || isQuoting">
           {{ isQuoting ? '送信中...' : '引用する' }}
         </button>
       </div>
@@ -467,42 +422,21 @@ onMounted(() => {
         <button class="modal-close-btn" @click="showEditModal = false">×</button>
       </div>
       <div class="modal-body">
-        <textarea
-          v-model="editContent"
-          class="edit-textarea"
-          placeholder="投稿内容を入力"
-          maxlength="250"
-        ></textarea>
-        <div class="char-count" :class="{ 'error': editContent.length > 250 }">
-          {{ editContent.length }} / 250
-        </div>
-        <!-- 公開範囲の変更 -->
+        <textarea v-model="editContent" class="edit-textarea" placeholder="投稿内容を入力" maxlength="250"></textarea>
+        <div class="char-count" :class="{ 'error': editContent.length > 250 }">{{ editContent.length }} / 250</div>
         <div class="visibility-selector">
           <label class="visibility-label">公開範囲</label>
           <div class="visibility-options">
-            <label class="visibility-option">
-              <input type="radio" v-model="editVisibility" value="public" />
-              全員
-            </label>
-            <label class="visibility-option">
-              <input type="radio" v-model="editVisibility" value="followers" />
-              フォロワーのみ
-            </label>
-            <label class="visibility-option">
-              <input type="radio" v-model="editVisibility" value="private" />
-              自分のみ
-            </label>
+            <label class="visibility-option"><input type="radio" v-model="editVisibility" value="public" />全員</label>
+            <label class="visibility-option"><input type="radio" v-model="editVisibility" value="followers" />フォロワーのみ</label>
+            <label class="visibility-option"><input type="radio" v-model="editVisibility" value="private" />自分のみ</label>
           </div>
         </div>
         <p v-if="editError" class="edit-error">{{ editError }}</p>
       </div>
       <div class="modal-footer">
         <button class="cancel-btn" @click="showEditModal = false">キャンセル</button>
-        <button
-          class="submit-btn"
-          @click="handleUpdate"
-          :disabled="!editContent.trim() || editContent.length > 250 || isUpdating"
-        >
+        <button class="submit-btn" @click="handleUpdate" :disabled="!editContent.trim() || editContent.length > 250 || isUpdating">
           {{ isUpdating ? '保存中...' : '保存する' }}
         </button>
       </div>
@@ -524,10 +458,9 @@ onMounted(() => {
 .menu-item:hover { background-color: #f5f0ff; }
 .delete-item { color: #f66; }
 .delete-item:hover { background-color: #fff0f0; }
+/* icon-wrapperのサイズ指定を削除（UserAvatarが管理） */
 .icon-wrapper { flex-shrink: 0; margin-right: 10px; cursor: pointer; }
-.icon-wrapper:hover .post-user-icon { opacity: 0.8; }
-.post-user-icon { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background-color: #ddd; display: block; }
-.post-user-icon--empty { background-color: #ccc; }
+.icon-wrapper:hover { opacity: 0.8; }
 .post-user-info { flex: 1; display: flex; flex-direction: column; }
 .name-row { display: flex; align-items: center; gap: 2px; }
 .p-user-name { font-weight: bold; font-size: 14px; }
@@ -538,8 +471,6 @@ onMounted(() => {
 .quoted-post { border: 1px solid #e0e0e0; border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; background-color: #f8f8f8; cursor: pointer; }
 .quoted-post:hover { background-color: #f0e6ff; }
 .quoted-author { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
-.quoted-icon { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; display: block; flex-shrink: 0; }
-.quoted-icon--empty { background-color: #ccc; width: 20px; height: 20px; border-radius: 50%; }
 .quoted-name { font-weight: bold; font-size: 12px; color: #555; }
 .quoted-username { font-size: 11px; color: #aaa; }
 .quoted-content { margin: 0; font-size: 13px; color: #777; line-height: 1.5; }
@@ -556,8 +487,6 @@ onMounted(() => {
 .count-purple { color: #6a21aa; }
 .reply-form { margin-top: 12px; padding-top: 12px; border-top: 1px solid #eee; }
 .reply-form-inner { display: flex; gap: 10px; align-items: flex-start; }
-.reply-user-icon { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; display: block; }
-.reply-user-icon--empty { background-color: #ddd; width: 36px; height: 36px; border-radius: 50%; }
 .reply-input-area { flex: 1; }
 .reply-textarea { width: 100%; border: 1px solid #ddd; border-radius: 8px; padding: 8px 10px; font-size: 14px; resize: none; outline: none; box-sizing: border-box; font-family: inherit; }
 .reply-textarea:focus { border-color: #c65bed; }
@@ -568,8 +497,6 @@ onMounted(() => {
 .reply-cancel-btn { background: none; border: 1px solid #ddd; border-radius: 14px; padding: 5px 12px; font-size: 13px; cursor: pointer; }
 .reply-submit-btn { background-color: #c65bed; color: white; border: none; border-radius: 14px; padding: 5px 12px; font-size: 13px; font-weight: bold; cursor: pointer; }
 .reply-submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-/* モーダル共通 */
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 2000; display: flex; justify-content: center; align-items: center; }
 .modal { background: white; border-radius: 16px; width: 90%; max-width: 480px; max-height: 90vh; overflow-y: auto; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #eee; }
@@ -580,12 +507,8 @@ onMounted(() => {
 .cancel-btn { background: none; border: 1px solid #ddd; border-radius: 20px; padding: 8px 16px; font-size: 14px; cursor: pointer; }
 .submit-btn { background-color: #c65bed; color: white; border: none; border-radius: 20px; padding: 8px 16px; font-size: 14px; font-weight: bold; cursor: pointer; }
 .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-/* 引用リツイートモーダル */
 .quote-preview { border: 1px solid #e0e0e0; border-radius: 10px; padding: 12px; margin-bottom: 16px; background-color: #f8f8f8; }
 .quote-preview-author-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
-.quote-preview-icon { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; display: block; flex-shrink: 0; }
-.quote-preview-icon--empty { background-color: #ccc; width: 24px; height: 24px; border-radius: 50%; }
 .quote-preview-name { font-weight: bold; font-size: 13px; color: #333; }
 .quote-preview-username { font-size: 12px; color: #999; }
 .quote-preview-content { margin: 0; font-size: 13px; color: #555; line-height: 1.5; }
@@ -594,8 +517,6 @@ onMounted(() => {
 .char-count { text-align: right; font-size: 12px; color: #666; margin-top: 4px; }
 .char-count.error { color: red; font-weight: bold; }
 .quote-error { color: #f66; font-size: 13px; margin: 8px 0 0; }
-
-/* 投稿編集モーダル */
 .edit-textarea { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; box-sizing: border-box; outline: none; resize: none; min-height: 120px; font-family: inherit; }
 .edit-textarea:focus { border-color: #c65bed; }
 .visibility-selector { margin-top: 16px; }

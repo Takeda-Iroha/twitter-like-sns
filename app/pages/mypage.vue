@@ -6,25 +6,15 @@ import type { UserProfile, UserPost } from '~/composables/useUser'
 
 const isMenuOpen = ref(false)
 const { fetchUserProfile, updateProfile, fetchUserPosts } = useUser()
+const router = useRouter()
 
-// ----------------------------------------
-// 自分のusernameをCookieから取得
-// ----------------------------------------
 const loggedInUsername = useCookie('username').value
 
-// ----------------------------------------
-// URLパラメータからusernameを取得
-// /users/johndoe にアクセスしたとき
-// route.params.username に「johndoe」が入る
-// ただし /mypage の場合はパラメータがないので
-// loggedInUsername を使う
-// ----------------------------------------
 const route = useRoute()
 const targetUsername = computed(() => {
   return (route.params.username as string) || loggedInUsername || ''
 })
 
-// 自分のページかどうかを自動判定
 const isMyPage = computed(() => {
   return targetUsername.value === loggedInUsername
 })
@@ -40,7 +30,6 @@ const postsError = ref('')
 const isEditModalOpen = ref(false)
 const editDisplayName = ref('')
 const editBio = ref('')
-const editProfileImageUrl = ref('')
 const isUpdating = ref(false)
 const updateError = ref('')
 
@@ -76,25 +65,14 @@ const loadUserPosts = async () => {
 
   try {
     const result = await fetchUserPosts(targetUsername.value)
-
-    // ----------------------------------------
-    // 公開範囲による投稿フィルタリング
-    // isMyPage：全投稿表示
-    // フォロワーの場合：public + followers を表示
-    // 非フォロワーの場合：public のみ表示
-    // ----------------------------------------
     if (isMyPage.value) {
       userPosts.value = result.posts
     } else if (profile.value?.isFollowing) {
-      // フォロワーはpublic・followersの投稿を表示
       userPosts.value = result.posts.filter(
         p => p.visibility === 'public' || p.visibility === 'followers'
       )
     } else {
-      // 非フォロワーはpublicのみ
-      userPosts.value = result.posts.filter(
-        p => p.visibility === 'public'
-      )
+      userPosts.value = result.posts.filter(p => p.visibility === 'public')
     }
   } catch (error: any) {
     postsError.value = '投稿を読み込めませんでした'
@@ -103,13 +81,10 @@ const loadUserPosts = async () => {
   }
 }
 
-
-
 const openEditModal = () => {
   if (!profile.value) return
   editDisplayName.value = profile.value.displayName ?? ''
   editBio.value = profile.value.bio ?? ''
-  editProfileImageUrl.value = profile.value.profileImageUrl ?? ''
   updateError.value = ''
   isEditModalOpen.value = true
 }
@@ -126,7 +101,6 @@ const handleUpdateProfile = async () => {
     profile.value = await updateProfile({
       displayName: editDisplayName.value,
       bio: editBio.value,
-      profileImageUrl: editProfileImageUrl.value || undefined
     })
     closeEditModal()
   } catch (error: any) {
@@ -142,8 +116,6 @@ const handleUpdateProfile = async () => {
   }
 }
 
-
-
 onMounted(() => {
   loadProfile()
 })
@@ -157,21 +129,31 @@ onMounted(() => {
 
     <div class="mypage-wrapper">
 
+      <!-- 戻るボタン -->
+      <div class="cover-image">
+        <button class="back-btn" @click="router.back()">← 戻る</button>
+      </div>
+
       <p v-if="isLoading" class="status-text">読み込み中...</p>
       <p v-else-if="errorMessage" class="status-text error">{{ errorMessage }}</p>
 
       <template v-else-if="profile">
 
         <section class="profile-header">
-          <div class="cover-image">
-            <img v-if="profile.profileImageUrl" :src="profile.profileImageUrl" class="cover-img" alt="カバー画像" />
-            <span v-else class="cover-placeholder">ヘッダー画像</span>
-          </div>
 
           <div class="profile-main">
             <div class="avatar-wrapper">
-              <img v-if="profile.profileImageUrl" :src="profile.profileImageUrl" class="avatar" alt="アイコン" />
-              <div v-else class="avatar avatar--empty" />
+              <!-- アイコン画像がある場合はそのまま表示 -->
+              <!-- ない場合はグレー背景にicon_mypage.svgを表示 -->
+              <img
+                v-if="profile.profileImageUrl"
+                :src="profile.profileImageUrl"
+                class="avatar"
+                alt="アイコン"
+              />
+              <div v-else class="avatar avatar--default">
+                <img src="/images/icon_mypage.svg" class="avatar-default-icon" alt="デフォルトアイコン" />
+              </div>
             </div>
 
             <div class="profile-action">
@@ -211,7 +193,7 @@ onMounted(() => {
       </template>
     </div>
 
-    <!-- 編集モーダル（自分のページのみ表示） -->
+    <!-- 編集モーダル（自分のページのみ） -->
     <div v-if="isEditModalOpen && isMyPage" class="modal-overlay" @click.self="closeEditModal">
       <div class="modal">
         <div class="modal-header">
@@ -219,13 +201,6 @@ onMounted(() => {
           <button class="modal-close-btn" @click="closeEditModal">×</button>
         </div>
         <div class="modal-body">
-          <div class="input-group">
-            <label class="input-label">アイコン画像URL</label>
-            <input v-model="editProfileImageUrl" type="text" class="modal-input" placeholder="https://example.com/image.jpg" />
-            <div v-if="editProfileImageUrl" class="image-preview">
-              <img :src="editProfileImageUrl" class="preview-icon" alt="プレビュー" @error="editProfileImageUrl = ''" />
-            </div>
-          </div>
           <div class="input-group">
             <label class="input-label">表示名</label>
             <input v-model="editDisplayName" type="text" class="modal-input" placeholder="表示名を入力" />
@@ -250,13 +225,64 @@ onMounted(() => {
 
 <style scoped>
 .mypage-wrapper { max-width: 600px; margin: 0 auto; background-color: #fff; min-height: 100vh; border-left: 1px solid #ddd; border-right: 1px solid #ddd; }
-.cover-image { width: 100%; height: 160px; background-color: #eee; display: flex; justify-content: center; align-items: center; overflow: hidden; }
-.cover-img { width: 100%; height: 100%; object-fit: cover; }
-.cover-placeholder { color: #999; font-size: 14px; }
+
+.cover-image {
+  width: 100%;
+  height: 160px;
+  background-color: #e9d5ff;
+  position: relative;  /* ← 追加 */
+}
+.back-btn {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(255,255,255,0.85);
+  border: none;
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 14px;
+  cursor: pointer;
+  color: #6a21aa;
+  font-weight: bold;
+}
+.back-btn:hover { background: rgba(255,255,255,1); }
+
 .profile-main { padding: 0 20px 20px; }
-.avatar-wrapper { margin-top: -45px; margin-bottom: 10px; }
-.avatar { width: 90px; height: 90px; border-radius: 50%; border: 4px solid #fff; object-fit: cover; display: block; }
-.avatar--empty { background-color: #ccc; }
+.avatar-wrapper {
+  margin-top: -45px;
+  margin-bottom: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+/* アイコン画像あり */
+.avatar {
+  width: 90px; height: 90px;
+  border-radius: 50%;
+  border: 4px solid #fff;
+  object-fit: cover;
+  display: block;
+}
+
+/* デフォルトアイコン（グレー背景＋icon_mypage.svg） */
+.avatar--default {
+  width: 90px; height: 90px;
+  border-radius: 50%;
+  border: 4px solid #fff;
+  background-color: #ccc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: content-box;
+  overflow: hidden;
+}
+.avatar-default-icon {
+  width: 50px; height: 50px;
+  object-fit: contain;
+  /* アイコンを白色に変換 */
+  filter: brightness(0) invert(1);
+}
+
 .profile-action { display: flex; justify-content: flex-end; margin-bottom: 10px; }
 .edit-btn { background: none; border: 1px solid #c65bed; border-radius: 20px; padding: 6px 16px; font-size: 13px; color: #c65bed; cursor: pointer; font-weight: bold; }
 .edit-btn:hover { background-color: #f5e6ff; }
@@ -272,7 +298,6 @@ onMounted(() => {
 .status-text.error { color: #f66; }
 .post-list { padding: 0 15px 50px; }
 
-@keyframes heartPop { 0% { transform: scale(1); } 50% { transform: scale(1.4); } 100% { transform: scale(1); } }
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 2000; display: flex; justify-content: center; align-items: center; }
 .modal { background: white; border-radius: 16px; width: 90%; max-width: 480px; max-height: 90vh; overflow-y: auto; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #eee; position: sticky; top: 0; background: white; z-index: 1; }
@@ -285,8 +310,6 @@ onMounted(() => {
 .modal-input:focus { border-color: #c65bed; }
 .modal-textarea { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; box-sizing: border-box; outline: none; resize: none; }
 .modal-textarea:focus { border-color: #c65bed; }
-.image-preview { margin-top: 10px; display: flex; justify-content: center; }
-.preview-icon { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid #ddd; }
 .update-error { color: #f66; font-size: 13px; margin: 0; }
 .modal-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 20px; border-top: 1px solid #eee; }
 .cancel-btn { background: none; border: 1px solid #ddd; border-radius: 20px; padding: 8px 16px; font-size: 14px; cursor: pointer; }

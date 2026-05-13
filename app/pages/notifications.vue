@@ -156,19 +156,14 @@ onMounted(() => {
           class="notification-card"
           :class="{ 'is-new': newNotificationIds.includes(notification.id) }"
         >
-          <!-- actorがある場合はクリックでプロフィールへ遷移 -->
           <div
             class="actor-icon-wrapper"
             @click="notification.actor ? goToActorProfile(notification.actor.username) : null"
           >
-            <img
-              v-if="notification.actor?.profileImageUrl"
-              :src="notification.actor.profileImageUrl"
-              class="actor-icon"
-              alt="ユーザーアイコン"
+            <UserAvatar
+              :profile-image-url="notification.actor?.profileImageUrl"
+              :size="48"
             />
-            <!-- actorがない・画像がない場合はグレーの丸 -->
-            <div v-else class="actor-icon actor-icon--empty" />
           </div>
 
           <div class="notification-body">
@@ -287,14 +282,6 @@ body {
   flex-shrink: 0;
   cursor: pointer;
 }
-.actor-icon {
-  width: 48px; height: 48px;
-  border-radius: 50%;
-  object-fit: cover;
-  display: block;
-}
-.actor-icon--empty { background-color: #ddd; }
-.actor-icon-wrapper:hover .actor-icon { opacity: 0.8; }
 
 .notification-body {
   flex: 1;
