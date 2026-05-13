@@ -1,8 +1,4 @@
-<!-- app/components/AppHeader.vue -->
 <script setup lang="ts">
-// 親コンポーネントからisMenuOpenを操作できるようにemitを使う
-// emit：子から親へイベントを伝える仕組み
-// 「メニューを開いて」というイベントを親に伝える
 const emit = defineEmits<{
   openMenu: []
 }>()

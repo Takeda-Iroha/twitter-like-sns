@@ -1,4 +1,3 @@
-<!-- app/pages/users/[username].vue -->
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useUser } from '~/composables/useUser'

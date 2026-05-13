@@ -140,7 +140,7 @@ onMounted(() => {
             :disabled="attachedImages.length >= 4"
             @change="handleImageSelect"
           />
-          🖼 画像
+           画像
         </label>
 
         <div class="visibility-wrapper">

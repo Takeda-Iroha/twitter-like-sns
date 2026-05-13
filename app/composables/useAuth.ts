@@ -1,5 +1,3 @@
-// app/composables/useAuth.ts
-
 const BASE_URL = 'https://apg-joetsu.tail02904.ts.net/api'
 
 export const useAuth = () => {

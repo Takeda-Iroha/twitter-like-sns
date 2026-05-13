@@ -1,4 +1,3 @@
-<!-- app/components/PostCard.vue -->
 <script setup lang="ts">
 import type { Post } from '~/composables/usePost'
 import { usePost } from '~/composables/usePost'

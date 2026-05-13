@@ -1,4 +1,3 @@
-<!-- app/components/UserAvatar.vue -->
 <script setup lang="ts">
 const props = defineProps<{
   profileImageUrl?: string | null

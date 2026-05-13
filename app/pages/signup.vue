@@ -1,4 +1,3 @@
-<!-- app/pages/signup.vue -->
 <script setup lang="ts">
 import { ref } from 'vue'
 import type { FetchError } from 'ofetch'

@@ -1,5 +1,3 @@
-// app/composables/useUser.ts
-
 const BASE_URL = 'https://apg-joetsu.tail02904.ts.net/api'
 
 // ----------------------------------------

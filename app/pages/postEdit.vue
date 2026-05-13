@@ -1,4 +1,3 @@
-<!-- app/pages/postEdit.vue -->
 <script setup lang="ts">
 import { ref } from 'vue'
 

@@ -1,4 +1,3 @@
-<!-- app/pages/notifications.vue -->
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useNotification } from '~/composables/useNotification'

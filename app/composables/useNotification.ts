@@ -1,5 +1,3 @@
-// app/composables/useNotification.ts
-
 const BASE_URL = 'https://apg-joetsu.tail02904.ts.net/api'
 
 // ----------------------------------------

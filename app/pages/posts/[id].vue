@@ -1,4 +1,3 @@
-<!-- app/pages/posts/[id].vue -->
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { usePost } from '~/composables/usePost'
