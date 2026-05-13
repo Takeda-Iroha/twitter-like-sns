@@ -38,7 +38,10 @@ const handleLogin = async () => {
       authToken.value = token
       refreshToken.value = refresh_token
       usernameCookie.value = response.data?.user?.username
-      navigateTo('/')
+      // redirectパラメータがあればそこへ、なければ / へ
+      const redirect = useRoute().query.redirect as string
+      navigateTo(redirect || '/')
+
     } else {
       console.error('Unexpected response structure:', response)
       alert('認証データが正しく取得できませんでした。')
