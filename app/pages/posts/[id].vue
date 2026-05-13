@@ -328,16 +328,16 @@ onMounted(async () => {
               <!-- 引用リツイートの場合 -->
               <template v-if="isMyQuotePost">
                 <div class="menu-item delete-item" @click="handleDeleteQuotePost">
-                  🗑 引用リツイートを削除
+                  引用リツイートを削除
                 </div>
               </template>
               <!-- 通常の投稿の場合 -->
               <template v-else>
                 <div class="menu-item" @click="openEditModal">
-                  ✏️ 投稿を編集
+                  投稿を編集
                 </div>
                 <div class="menu-item delete-item" @click="handleDelete">
-                  🗑 投稿を削除
+                  投稿を削除
                 </div>
               </template>
             </div>

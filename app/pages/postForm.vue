@@ -3,21 +3,25 @@
 import { ref, computed, onMounted } from 'vue'
 import { usePost } from '~/composables/usePost'
 import { useUser } from '~/composables/useUser'
+import { useUpload } from '~/composables/useUpload'
 
 const isMenuOpen = ref(false)
 const { createPost } = usePost()
 const { fetchUserProfile } = useUser()
+const { uploadImage } = useUpload()
 const router = useRouter()
 
 const postContent = ref('')
 const visibility = ref<'public' | 'followers' | 'private'>('public')
 const showVisibilityMenu = ref(false)
-const attachedImages = ref<File[]>([])
-const previewUrls = ref<string[]>([])
 const isSubmitting = ref(false)
 const errorMessage = ref('')
 
-// 自分のアイコン画像を取得
+// 添付画像（1枚のみ）
+const attachedFile = ref<File | null>(null)
+const previewUrl = ref<string | null>(null)
+const isUploading = ref(false)
+
 const myProfileImageUrl = ref('')
 const loggedInUsername = useCookie('username').value
 
@@ -37,19 +41,20 @@ const visibilityLabel = computed(() => {
 
 const handleImageSelect = (event: Event) => {
   const input = event.target as HTMLInputElement
-  if (!input.files) return
-  const files = Array.from(input.files)
-  const remaining = 4 - attachedImages.value.length
-  const newFiles = files.slice(0, remaining)
-  attachedImages.value = [...attachedImages.value, ...newFiles]
-  const newUrls = newFiles.map(file => URL.createObjectURL(file))
-  previewUrls.value = [...previewUrls.value, ...newUrls]
+  if (!input.files || !input.files[0]) return
+  const file = input.files[0]
+  // 以前のプレビューURLを解放
+  if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
+  attachedFile.value = file
+  previewUrl.value = URL.createObjectURL(file)
+  // inputをリセット（同じファイルを再選択できるように）
+  input.value = ''
 }
 
-const removeImage = (index: number) => {
-  URL.revokeObjectURL(previewUrls.value[index] ?? '')
-  attachedImages.value = attachedImages.value.filter((_, i) => i !== index)
-  previewUrls.value = previewUrls.value.filter((_, i) => i !== index)
+const removeImage = () => {
+  if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
+  attachedFile.value = null
+  previewUrl.value = null
 }
 
 const handleCreatePost = async () => {
@@ -58,13 +63,23 @@ const handleCreatePost = async () => {
   errorMessage.value = ''
 
   try {
+    let imageUrl: string | undefined = undefined
+
+    // 画像が添付されていればアップロードしてURLを取得
+    if (attachedFile.value) {
+      isUploading.value = true
+      imageUrl = await uploadImage(attachedFile.value)
+      isUploading.value = false
+    }
+
     await createPost({
       content: postContent.value,
       visibility: visibility.value,
-      imageUrls: []
+      imageUrls: imageUrl ? [imageUrl] : []
     })
     navigateTo('/')
   } catch (error: any) {
+    isUploading.value = false
     if (error.status === 401) {
       errorMessage.value = 'ログインが必要です'
     } else if (error.status === 400) {
@@ -100,7 +115,7 @@ onMounted(() => {
             class="post-btn"
             :disabled="!postContent.trim() || postContent.length > 250 || isSubmitting"
           >
-            {{ isSubmitting ? '投稿中...' : '投稿する' }}
+            {{ isUploading ? '画像アップロード中...' : isSubmitting ? '投稿中...' : '投稿する' }}
           </button>
           <div class="char-count" :class="{ 'error': postContent.length > 250 }">
             {{ postContent.length }} / 250
@@ -111,36 +126,28 @@ onMounted(() => {
       <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
 
       <div class="post-form-content">
-        <!-- APIから取得したアイコン画像を表示 -->
-        <img
-          v-if="myProfileImageUrl"
-          :src="myProfileImageUrl"
-          class="user-icon"
-          alt="自分のアイコン"
-        />
-        <div v-else class="user-icon user-icon--empty" />
-
+        <UserAvatar :profile-image-url="myProfileImageUrl" :size="60" />
         <textarea v-model="postContent" class="post-textarea" placeholder="今なにしてる？"></textarea>
       </div>
 
-      <div v-if="previewUrls.length > 0" class="image-preview-list">
-        <div v-for="(url, index) in previewUrls" :key="index" class="image-preview-item">
-          <img :src="url" class="preview-image" alt="添付画像" />
-          <button class="remove-image-btn" @click="removeImage(index)">×</button>
+      <!-- 画像プレビュー -->
+      <div v-if="previewUrl" class="image-preview-area">
+        <div class="image-preview-item">
+          <img :src="previewUrl" class="preview-image" alt="添付画像" />
+          <button class="remove-image-btn" @click="removeImage">×</button>
         </div>
       </div>
 
       <div class="bottom-actions">
-        <label class="action-btn" :class="{ 'disabled': attachedImages.length >= 4 }">
+        <!-- 画像が未添付のときのみ表示 -->
+        <label v-if="!attachedFile" class="action-btn">
           <input
             type="file"
             accept="image/*"
-            multiple
             style="display: none"
-            :disabled="attachedImages.length >= 4"
             @change="handleImageSelect"
           />
-           画像
+          📷 画像
         </label>
 
         <div class="visibility-wrapper">
@@ -197,17 +204,14 @@ body {
 .char-count { text-align: right; font-size: 12px; color: #666; }
 .char-count.error { color: red; font-weight: bold; }
 .error-message { color: #f66; font-size: 13px; text-align: center; margin: 0 0 8px; }
-.post-form-content { display: flex; padding: 10px; gap: 12px; }
-.user-icon { width: 60px; height: 60px; border-radius: 50%; flex-shrink: 0; object-fit: cover; display: block; }
-.user-icon--empty { width: 60px; height: 60px; border-radius: 50%; flex-shrink: 0; background-color: #ddd; }
+.post-form-content { display: flex; padding: 10px; gap: 12px; align-items: flex-start; }
 .post-textarea { flex: 1; border: none; outline: none; font-size: 18px; resize: none; min-height: 200px; padding-top: 10px; background-color: transparent; font-family: inherit; }
-.image-preview-list { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 10px 10px; }
-.image-preview-item { position: relative; width: calc(50% - 4px); }
-.preview-image { width: 100%; height: 150px; object-fit: cover; border-radius: 10px; }
+.image-preview-area { padding: 0 10px 10px; }
+.image-preview-item { position: relative; display: inline-block; }
+.preview-image { width: 100%; max-width: 300px; height: 200px; object-fit: cover; border-radius: 10px; display: block; }
 .remove-image-btn { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; background: rgba(0,0,0,0.5); color: white; border: none; border-radius: 50%; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .bottom-actions { display: flex; align-items: center; gap: 10px; padding: 10px 15px; border-top: 1px solid #eee; }
 .action-btn { background: none; border: 1px solid #c65bed; border-radius: 20px; padding: 6px 14px; font-size: 13px; color: #c65bed; cursor: pointer; }
-.action-btn.disabled { opacity: 0.4; cursor: not-allowed; }
 .visibility-wrapper { position: relative; }
 .visibility-menu { position: absolute; bottom: 40px; left: 0; background: white; border: 1px solid #ddd; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; z-index: 10; min-width: 160px; }
 .visibility-option { padding: 12px 16px; font-size: 14px; cursor: pointer; }

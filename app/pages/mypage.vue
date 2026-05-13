@@ -1,10 +1,13 @@
+<!-- app/pages/mypage.vue -->
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useUser } from '~/composables/useUser'
 import type { UserProfile, UserPost } from '~/composables/useUser'
+import { useUpload } from '~/composables/useUpload'
 
 const isMenuOpen = ref(false)
 const { fetchUserProfile, updateProfile, fetchUserPosts } = useUser()
+const { uploadImage } = useUpload()
 const router = useRouter()
 
 const loggedInUsername = useCookie('username').value
@@ -31,6 +34,12 @@ const editDisplayName = ref('')
 const editBio = ref('')
 const isUpdating = ref(false)
 const updateError = ref('')
+
+// アイコン関連
+const editIconUrl = ref<string | null>(null)   // アップロード後のURL
+const editIconPreview = ref<string | null>(null) // ローカルプレビュー用
+const isIconUploading = ref(false)
+const iconUploadError = ref('')
 
 const loadProfile = async () => {
   isLoading.value = true
@@ -84,12 +93,43 @@ const openEditModal = () => {
   if (!profile.value) return
   editDisplayName.value = profile.value.displayName ?? ''
   editBio.value = profile.value.bio ?? ''
+  editIconUrl.value = null
+  editIconPreview.value = null
+  iconUploadError.value = ''
   updateError.value = ''
   isEditModalOpen.value = true
 }
 
 const closeEditModal = () => {
+  if (editIconPreview.value) URL.revokeObjectURL(editIconPreview.value)
+  editIconUrl.value = null
+  editIconPreview.value = null
   isEditModalOpen.value = false
+}
+
+// 画像選択時に即アップロードしてURLを保存
+const handleIconSelect = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  if (!input.files || !input.files[0]) return
+  const file = input.files[0]
+
+  // ローカルプレビューを表示
+  if (editIconPreview.value) URL.revokeObjectURL(editIconPreview.value)
+  editIconPreview.value = URL.createObjectURL(file)
+
+  // 即アップロード
+  isIconUploading.value = true
+  iconUploadError.value = ''
+  try {
+    editIconUrl.value = await uploadImage(file)
+  } catch {
+    iconUploadError.value = 'アイコンのアップロードに失敗しました'
+    editIconUrl.value = null
+    editIconPreview.value = null
+  } finally {
+    isIconUploading.value = false
+    input.value = ''
+  }
 }
 
 const handleUpdateProfile = async () => {
@@ -100,6 +140,8 @@ const handleUpdateProfile = async () => {
     profile.value = await updateProfile({
       displayName: editDisplayName.value,
       bio: editBio.value,
+      // アイコンが更新されていればURLを渡す・なければ渡さない
+      ...(editIconUrl.value ? { profileImageUrl: editIconUrl.value } : {})
     })
     closeEditModal()
   } catch (error: any) {
@@ -128,7 +170,6 @@ onMounted(() => {
 
     <div class="mypage-wrapper">
 
-      <!-- 戻るボタン -->
       <div class="cover-image">
         <button class="back-btn" @click="router.back()">← 戻る</button>
       </div>
@@ -139,11 +180,8 @@ onMounted(() => {
       <template v-else-if="profile">
 
         <section class="profile-header">
-
           <div class="profile-main">
             <div class="avatar-wrapper">
-              <!-- アイコン画像がある場合はそのまま表示 -->
-              <!-- ない場合はグレー背景にicon_mypage.svgを表示 -->
               <img
                 v-if="profile.profileImageUrl"
                 :src="profile.profileImageUrl"
@@ -192,7 +230,7 @@ onMounted(() => {
       </template>
     </div>
 
-    <!-- 編集モーダル（自分のページのみ） -->
+    <!-- 編集モーダル -->
     <div v-if="isEditModalOpen && isMyPage" class="modal-overlay" @click.self="closeEditModal">
       <div class="modal">
         <div class="modal-header">
@@ -200,6 +238,45 @@ onMounted(() => {
           <button class="modal-close-btn" @click="closeEditModal">×</button>
         </div>
         <div class="modal-body">
+
+          <!-- アイコン画像 -->
+          <div class="input-group">
+            <label class="input-label">アイコン画像</label>
+            <div class="icon-upload-area">
+              <!-- プレビュー優先、なければ現在のアイコン、なければデフォルト -->
+              <img
+                v-if="editIconPreview"
+                :src="editIconPreview"
+                class="icon-preview"
+                alt="プレビュー"
+              />
+              <img
+                v-else-if="profile?.profileImageUrl"
+                :src="profile.profileImageUrl"
+                class="icon-preview"
+                alt="現在のアイコン"
+              />
+              <div v-else class="icon-preview icon-preview--default">
+                <img src="/images/icon_mypage.svg" class="icon-preview-svg" alt="" />
+              </div>
+
+              <div class="icon-upload-right">
+                <label class="icon-upload-btn" :class="{ 'disabled': isIconUploading }">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style="display: none"
+                    :disabled="isIconUploading"
+                    @change="handleIconSelect"
+                  />
+                  {{ isIconUploading ? 'アップロード中...' : '画像を変更' }}
+                </label>
+                <p v-if="iconUploadError" class="icon-upload-error">{{ iconUploadError }}</p>
+                <p v-if="editIconUrl" class="icon-upload-success">✅ アップロード完了</p>
+              </div>
+            </div>
+          </div>
+
           <div class="input-group">
             <label class="input-label">表示名</label>
             <input v-model="editDisplayName" type="text" class="modal-input" placeholder="表示名を入力" />
@@ -212,7 +289,11 @@ onMounted(() => {
         </div>
         <div class="modal-footer">
           <button class="cancel-btn" @click="closeEditModal">キャンセル</button>
-          <button class="save-btn" @click="handleUpdateProfile" :disabled="isUpdating">
+          <button
+            class="save-btn"
+            @click="handleUpdateProfile"
+            :disabled="isUpdating || isIconUploading"
+          >
             {{ isUpdating ? '保存中...' : '保存する' }}
           </button>
         </div>
@@ -225,62 +306,19 @@ onMounted(() => {
 <style scoped>
 .mypage-wrapper { max-width: 600px; margin: 0 auto; background-color: #fff; min-height: 100vh; border-left: 1px solid #ddd; border-right: 1px solid #ddd; }
 
-.cover-image {
-  width: 100%;
-  height: 160px;
-  background-color: #e9d5ff;
-  position: relative;  /* ← 追加 */
-}
+.cover-image { width: 100%; height: 160px; background-color: #e9d5ff; position: relative; }
 .back-btn {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  background: rgba(255,255,255,0.85);
-  border: none;
-  border-radius: 20px;
-  padding: 6px 14px;
-  font-size: 14px;
-  cursor: pointer;
-  color: #6a21aa;
-  font-weight: bold;
+  position: absolute; top: 12px; left: 12px;
+  background: rgba(255,255,255,0.85); border: none; border-radius: 20px;
+  padding: 6px 14px; font-size: 14px; cursor: pointer; color: #6a21aa; font-weight: bold;
 }
 .back-btn:hover { background: rgba(255,255,255,1); }
 
 .profile-main { padding: 0 20px 20px; }
-.avatar-wrapper {
-  margin-top: -45px;
-  margin-bottom: 10px;
-  position: relative;
-  z-index: 1;
-}
-
-/* アイコン画像あり */
-.avatar {
-  width: 90px; height: 90px;
-  border-radius: 50%;
-  border: 4px solid #fff;
-  object-fit: cover;
-  display: block;
-}
-
-/* デフォルトアイコン（グレー背景＋icon_mypage.svg） */
-.avatar--default {
-  width: 90px; height: 90px;
-  border-radius: 50%;
-  border: 4px solid #fff;
-  background-color: #ccc;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: content-box;
-  overflow: hidden;
-}
-.avatar-default-icon {
-  width: 50px; height: 50px;
-  object-fit: contain;
-  /* アイコンを白色に変換 */
-  filter: brightness(0) invert(1);
-}
+.avatar-wrapper { margin-top: -45px; margin-bottom: 10px; position: relative; z-index: 1; }
+.avatar { width: 90px; height: 90px; border-radius: 50%; border: 4px solid #fff; object-fit: cover; display: block; }
+.avatar--default { width: 90px; height: 90px; border-radius: 50%; border: 4px solid #fff; background-color: #ccc; display: flex; align-items: center; justify-content: center; box-sizing: content-box; overflow: hidden; }
+.avatar-default-icon { width: 50px; height: 50px; object-fit: contain; filter: brightness(0) invert(1); }
 
 .profile-action { display: flex; justify-content: flex-end; margin-bottom: 10px; }
 .edit-btn { background: none; border: 1px solid #c65bed; border-radius: 20px; padding: 6px 16px; font-size: 13px; color: #c65bed; cursor: pointer; font-weight: bold; }
@@ -314,4 +352,19 @@ onMounted(() => {
 .cancel-btn { background: none; border: 1px solid #ddd; border-radius: 20px; padding: 8px 16px; font-size: 14px; cursor: pointer; }
 .save-btn { background-color: #c65bed; color: white; border: none; border-radius: 20px; padding: 8px 16px; font-size: 14px; font-weight: bold; cursor: pointer; }
 .save-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* アイコンアップロード */
+.icon-upload-area { display: flex; align-items: center; gap: 16px; }
+.icon-preview { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 2px solid #ddd; display: block; flex-shrink: 0; }
+.icon-preview--default { background-color: #ccc; display: flex; align-items: center; justify-content: center; }
+.icon-preview-svg { width: 40px; height: 40px; filter: brightness(0) invert(1); }
+.icon-upload-right { display: flex; flex-direction: column; gap: 6px; }
+.icon-upload-btn {
+  background: none; border: 1px solid #c65bed; border-radius: 20px;
+  padding: 6px 14px; font-size: 13px; color: #c65bed; cursor: pointer; white-space: nowrap;
+}
+.icon-upload-btn:hover { background-color: #f5e6ff; }
+.icon-upload-btn.disabled { opacity: 0.6; cursor: not-allowed; }
+.icon-upload-error { color: #f66; font-size: 12px; margin: 0; }
+.icon-upload-success { color: #4caf50; font-size: 12px; margin: 0; }
 </style>
